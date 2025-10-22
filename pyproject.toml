@@ -1,0 +1,25 @@
+[project]
+authors = [
+  {name = "Insolight"}
+]
+dependencies = []
+name = "sensorApp"
+requires-python = ">= 3.11"
+version = "0.1.0"
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64"]
+
+[tool.pixi.pypi-dependencies]
+sensorapp = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+start = "python -m src.sensorapp.main"
+
+[tool.pixi.dependencies]
+pymodbus = "3.5.4.*"
