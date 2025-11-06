@@ -36,7 +36,8 @@ class SerialClient(ABC):
         self.stopbits: int = stopbits
         self.bytesize: int = bytesize
         self.timeout: int = timeout
-        self.sensor: Sensor | None = sensor
+        self.sensor: Sensor = sensor
+        self.client: ModbusClient | serial.Serial
 
     @abstractmethod
     def connect(self):
@@ -44,6 +45,17 @@ class SerialClient(ABC):
 
     @abstractmethod
     def disconnect(self):
+        pass
+
+    @abstractmethod
+    def setup_sensor(
+        self,
+        *,
+        current_slave_id: int,
+        new_slave_id: int,
+        new_baudrate: int = 9600,
+        new_parity: str = "N",
+    ):
         pass
 
     # @abstractmethod
@@ -65,6 +77,7 @@ class ModbusRS485Client(SerialClient):
     ):
         super().__init__(protocol=SensorProtocol.MODBUS, port=port, baudrate=baudrate, parity=parity, sensor=sensor)
         self.client: ModbusClient | None = None
+        self.connect()
 
     def connect(self):
         try:
@@ -75,11 +88,10 @@ class ModbusRS485Client(SerialClient):
                 parity=self.parity,
                 stopbits=self.stopbits,
                 bytesize=self.bytesize,
-                timeout=self.timeout,
+                timeout=0.5,
+                retries=0,
             )
-            if self.client.connect():
-                log_message(level="INFO", message=f"Modbus client connected on {self.port} at {self.baudrate} baud.")
-            else:
+            if not self.client.connect():
                 raise ModbusException("Failed to connect Modbus client.")
         except ModbusException as e:
             log_message(level="ERROR", message=f"Error connecting Modbus client: {e}")
@@ -88,7 +100,22 @@ class ModbusRS485Client(SerialClient):
     def disconnect(self):
         if self.client:
             self.client.close()
-            log_message(level="INFO", message="Modbus client disconnected.")
+
+    def setup_sensor(
+        self,
+        *,
+        current_slave_id: int,
+        new_slave_id: int,
+        new_baudrate: int = 9600,
+        new_parity: str = "N",
+    ):
+        self.sensor.setup_sensor(
+            client=self.client,
+            current_slave_id=current_slave_id,
+            new_slave_id=new_slave_id,
+            new_baudrate=new_baudrate,
+            new_parity=new_parity,
+        )
 
     def read_data(self, *, id: int) -> dict[str, int | float] | None:
         if not self.client:
@@ -114,13 +141,12 @@ class SDI12Client(SerialClient):
     def __init__(self, *, port: str, baudrate: int = 1200, parity: str = "E", sensor: Sensor):
         super().__init__(protocol=SensorProtocol.SDI_12, port=port, baudrate=baudrate, parity=parity, sensor=sensor)
         self.client: serial.Serial | None = None
+        self.connect()
 
     def connect(self):
         try:
             self.client = serial.Serial(port=self.port, baudrate=self.baudrate, parity=self.parity, timeout=1)
-            if self.client.is_open:
-                log_message(level="INFO", message=f"SDI-12 client connected on {self.port} at {self.baudrate} baud.")
-            else:
+            if not self.client.is_open:
                 raise serial.SerialException("Failed to open SDI-12 serial port.")
         except serial.SerialException as e:
             log_message(level="ERROR", message=f"Error connecting SDI-12 client: {e}")
@@ -129,4 +155,19 @@ class SDI12Client(SerialClient):
     def disconnect(self):
         if self.client and self.client.is_open:
             self.client.close()
-            log_message(level="INFO", message="SDI-12 client disconnected.")
+
+    def setup_sensor(
+        self,
+        *,
+        current_slave_id: int,
+        new_slave_id: int,
+        new_baudrate: int = 9600,
+        new_parity: str = "N",
+    ):
+        self.sensor.setup_sensor(
+            client=self,
+            current_slave_id=current_slave_id,
+            new_slave_id=new_slave_id,
+            new_baudrate=new_baudrate,
+            new_parity=new_parity,
+        )

@@ -58,7 +58,7 @@ class ModbusSensor(Sensor):
     def setup_sensor(
         self,
         *,
-        client: ModbusClient,
+        client,
         current_slave_id: int,
         new_slave_id: int,
         new_baudrate: int = 9600,
@@ -105,7 +105,7 @@ class RikaPar(ModbusSensor):
     def setup_sensor(
         self,
         *,
-        client: ModbusClient,
+        client,
         current_slave_id: int,
         new_slave_id: int,
         new_baudrate: int = 9600,
@@ -115,10 +115,14 @@ class RikaPar(ModbusSensor):
             client=client, address=0x42, value=new_slave_id, slave_id=current_slave_id
         )
 
-    def get_current_slave_id(self, client):
-        return read_holding_registers(
-            client=client, address=0, count=1, slave_id=0
-        ).slave_id
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
+        try:
+            slave_id = read_holding_registers(
+                client=client, address=0, count=1, slave_id=slave_id
+            ).slave_id
+        except ModbusException:
+            return -1
+        return slave_id
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
         registers = read_holding_registers(
@@ -167,7 +171,7 @@ class RikaTH(ModbusSensor):
     def setup_sensor(
         self,
         *,
-        client: ModbusClient,
+        client,
         current_slave_id: int,
         new_slave_id: int,
         new_baudrate: int = 9600,
@@ -177,16 +181,13 @@ class RikaTH(ModbusSensor):
             client=client, address=0x00, value=new_slave_id, slave_id=current_slave_id
         )
 
-    def get_current_slave_id(self, client):
-        slave_id = -1
-        for i in range(0, 255):
-            try:
-                slave_id = read_holding_registers(
-                    client=client, address=0, count=1, slave_id=i
-                ).slave_id
-                break
-            except ModbusException:
-                continue
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
+        try:
+            slave_id = read_holding_registers(
+                client=client, address=0, count=1, slave_id=slave_id
+            ).slave_id
+        except ModbusException:
+            return -1
         return slave_id
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
@@ -246,7 +247,7 @@ class ApogeePar(ModbusSensor):
     def setup_sensor(
         self,
         *,
-        client: ModbusClient,
+        client,
         current_slave_id: int,
         new_slave_id: int,
         new_baudrate: int = 9600,
@@ -265,16 +266,13 @@ class ApogeePar(ModbusSensor):
             client=client, address=0x30, values=new_slave_id, slave_id=current_slave_id
         )
 
-    def get_current_slave_id(self, client):
-        slave_id = -1
-        for i in range(0, 255):
-            try:
-                slave_id = read_holding_registers(
-                    client=client, address=0x30, count=1, slave_id=i
-                ).slave_id
-                break
-            except ModbusException:
-                continue
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
+        try:
+            slave_id = read_holding_registers(
+                client=client, address=0x30, count=1, slave_id=slave_id
+            ).slave_id
+        except ModbusException:
+            return -1
         return slave_id
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
@@ -333,7 +331,7 @@ class ApogeeGhi(ModbusSensor):
     def setup_sensor(
         self,
         *,
-        client: ModbusClient,
+        client,
         current_slave_id: int,
         new_slave_id: int,
         new_baudrate: int = 9600,
@@ -341,27 +339,27 @@ class ApogeeGhi(ModbusSensor):
     ):
         baud = {115200: 0, 57600: 1, 38400: 2, 19200: 3, 9600: 4}[new_baudrate]
         parity = {"N": 0, "O": 1, "E": 2}[new_parity]
-
+        print("Setting up Apogee GHI sensor...")
         write_registers(
             client=client, address=0x33, values=baud, slave_id=current_slave_id
         )
+        print(f"Baudrate set to {new_baudrate}.")
         write_registers(
             client=client, address=0x34, values=parity, slave_id=current_slave_id
         )
+        print(f"Parity set to {new_parity}.")
         write_registers(
             client=client, address=0x30, values=new_slave_id, slave_id=current_slave_id
         )
+        print(f"Slave ID set to {new_slave_id}.")
 
-    def get_current_slave_id(self, client):
-        slave_id = -1
-        for i in range(0, 255):
-            try:
-                slave_id = read_holding_registers(
-                    client=client, address=0x30, count=1, slave_id=i
-                ).slave_id
-                break
-            except ModbusException:
-                continue
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
+        try:
+            slave_id = read_holding_registers(
+                client=client, address=0x30, count=1, slave_id=slave_id
+            ).slave_id
+        except ModbusException:
+            return -1
         return slave_id
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
@@ -412,7 +410,7 @@ class SeeedLeafWetness(ModbusSensor):
     def setup_sensor(
         self,
         *,
-        client: ModbusClient,
+        client,
         current_slave_id: int,
         new_slave_id: int,
         new_baudrate: int = 9600,
@@ -422,16 +420,13 @@ class SeeedLeafWetness(ModbusSensor):
             client=client, address=0x0200, value=new_slave_id, slave_id=current_slave_id
         )
 
-    def get_current_slave_id(self, client):
-        slave_id = -1
-        for i in range(0, 255):
-            try:
-                slave_id = read_holding_registers(
-                    client=client, address=0x0200, count=1, slave_id=i
-                ).slave_id
-                break
-            except ModbusException:
-                continue
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
+        try:
+            slave_id = read_holding_registers(
+                client=client, address=0x0200, count=1, slave_id=slave_id
+            ).slave_id
+        except ModbusException:
+            return -1
         return slave_id
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
@@ -486,7 +481,7 @@ class SeeedTH(ModbusSensor):
     def setup_sensor(
         self,
         *,
-        client: ModbusClient,
+        client,
         current_slave_id: int,
         new_slave_id: int,
         new_baudrate: int = 9600,
@@ -496,16 +491,13 @@ class SeeedTH(ModbusSensor):
             client=client, address=512, values=new_slave_id, slave_id=current_slave_id
         )
 
-    def get_current_slave_id(self, client):
-        slave_id = -1
-        for i in range(0, 255):
-            try:
-                slave_id = read_holding_registers(
-                    client=client, address=512, count=1, slave_id=i
-                ).slave_id
-                break
-            except ModbusException:
-                continue
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
+        try:
+            slave_id = read_holding_registers(
+                client=client, address=512, count=1, slave_id=slave_id
+            ).slave_id
+        except ModbusException:
+            return -1
         return slave_id
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
@@ -575,7 +567,7 @@ class CampbellSoilTH(ModbusSensor):
     def setup_sensor(
         self,
         *,
-        client: ModbusClient,
+        client,
         current_slave_id: int,
         new_slave_id: int,
         new_baudrate: int = 9600,
@@ -585,16 +577,13 @@ class CampbellSoilTH(ModbusSensor):
             client=client, address=4100, value=new_slave_id, slave_id=current_slave_id
         )
 
-    def get_current_slave_id(self, client):
-        slave_id = -1
-        for i in range(0, 255):
-            try:
-                slave_id = read_holding_registers(
-                    client=client, address=4100, count=1, slave_id=i
-                ).slave_id
-                break
-            except ModbusException:
-                continue
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
+        try:
+            slave_id = read_holding_registers(
+                client=client, address=4100, count=1, slave_id=slave_id
+            ).slave_id
+        except ModbusException:
+            return -1
         return slave_id
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
@@ -629,6 +618,76 @@ class CampbellSoilTH(ModbusSensor):
             read_data.update({name: decoded})
         return read_data
 
+
+@register_sensor(name="Kipp&Zonen RT1")
+class KippZonenRT1(ModbusSensor):
+    @property
+    def sensor_name(self) -> str:
+        return "Kipp&Zonen RT1"
+
+    @property
+    def wire_color_configurations(self):
+        return [
+            WireColorConfiguration(label="V+", color="red"),
+            WireColorConfiguration(label="V-", color="blue"),
+            WireColorConfiguration(label="RS485A", color="yellow"),
+            WireColorConfiguration(label="RS485B", color="grey"),
+        ]
+
+    @property
+    def settings(self):
+        return {
+            "insolight": {
+                "baudrate": 9600,
+                "parity": "N",
+                "state": "disable",
+            },
+            "factory": {
+                "baudrate": 19200,
+                "parity": "E",
+                "state": "disable",
+            },
+        }
+
+    def needs_power_cycle_before_setup(self) -> bool:
+        return False
+
+    def can_broadcast_read(self) -> bool:
+        return True
+
+    def can_broadcast_setup(self) -> bool:
+        return True
+
+    def setup_sensor(
+        self,
+        *,
+        client,
+        current_slave_id: int,
+        new_slave_id: int,
+        new_baudrate: int = 9600,
+        new_parity: str = "N",
+    ):
+        write_register(
+            client=client, address=0x00, value=new_slave_id, slave_id=current_slave_id
+        )
+
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
+        try:
+            slave_id = read_holding_registers(
+                client=client, address=0, count=1, slave_id=slave_id
+            ).slave_id
+        except ModbusException:
+            return -1
+        return slave_id
+
+    def read_sensor(self, client, slave_id) -> dict[str, int | float]:
+        registers = read_holding_registers(
+            client=client, address=0, count=2, slave_id=slave_id
+        ).registers
+        return {
+            "radiation [W/m2]": registers[0],
+            "temperature [°C]": registers[1] / 10,
+        }
 
 @register_sensor(name="Rika Test")
 class RikaTest(ModbusSensor):
@@ -682,7 +741,7 @@ class RikaTest(ModbusSensor):
     def setup_sensor(
         self,
         *,
-        client: ModbusClient,
+        client,
         current_slave_id: int,
         new_slave_id: int,
         new_baudrate: int = 9600,
@@ -690,7 +749,7 @@ class RikaTest(ModbusSensor):
     ):
         print("Sensor setup complete")
 
-    def get_current_slave_id(self, client):
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
         return 0
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:

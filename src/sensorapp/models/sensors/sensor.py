@@ -1,13 +1,11 @@
 """
 Base sensor classes and unified registry system for all sensor types.
 """
-
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Type
 from enum import Enum
 
 from .wire_color import WireColorConfiguration
-
 
 class SensorProtocol(Enum):
     """Enum to identify sensor communication protocols."""
@@ -21,7 +19,7 @@ class Sensor(ABC):
 
     # Class attribute to be set by subclasses
     protocol: SensorProtocol | None = None
-    
+
     @property
     @abstractmethod
     def sensor_name(self) -> str:
@@ -56,20 +54,20 @@ class Sensor(ABC):
     def can_broadcast_setup(self) -> bool:
         """Wether broadcasting is possible for setup"""
 
-    # @abstractmethod
-    # def setup_sensor(
-    #     self,
-    #     *,
-    #     client: ModbusClient,
-    #     current_slave_id: int,
-    #     new_slave_id: int,
-    #     new_baudrate: int = 9600,
-    #     new_parity: str = "N",
-    # ):
-    #     pass
+    @abstractmethod
+    def setup_sensor(
+        self,
+        *,
+        client,
+        current_slave_id: int,
+        new_slave_id: int,
+        new_baudrate: int = 9600,
+        new_parity: str = "N",
+    ):
+        pass
 
     @abstractmethod
-    def get_current_slave_id(self, client) -> int:
+    def try_current_slave_id(self, *, client, slave_id: int = 0) -> int:
         pass
 
     @abstractmethod

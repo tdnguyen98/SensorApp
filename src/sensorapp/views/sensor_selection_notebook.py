@@ -173,3 +173,6 @@ class SensorSelectionNoteBook(ttk.Notebook, Observer):
             if data == "Color Codes":
                 self.update_color_wires()
             self.update_idletasks()
+        elif event_type == "client_connected" or event_type == "client_disconnected":
+            state = "disabled" if self.app_state.is_client_connected else "readonly"
+            self.sensor_combobox.configure(state=state)

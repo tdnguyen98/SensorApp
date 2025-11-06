@@ -10,6 +10,7 @@ from pymodbus.register_write_message import WriteSingleRegisterResponse, WriteMu
 from serial import Serial
 from serial.tools import list_ports
 
+import time
 
 def init_modbus_client(*, portname: str, baudrate: int, parity: str):
     return ModbusClient(port=portname, stopbits=1, bytesize=8, baudrate=baudrate, parity=parity, timeout=0.4)
@@ -19,7 +20,10 @@ def read_holding_registers(
     *, client: ModbusClient, address: int, count: int, slave_id: int
 ) -> ReadHoldingRegistersResponse:
     """Helper for reading holding registers and checking for errors"""
+    start_time = time.time()
+    print(f"[{time.time() - start_time:.2f}s] Starting read for slave {id}")
     res = client.read_holding_registers(address=address, count=count, slave=slave_id)
+    print(f"[{time.time() - start_time:.2f}s] Read completed")
     if isinstance(res, Exception):
         raise res
     if not isinstance(res, ReadHoldingRegistersResponse):

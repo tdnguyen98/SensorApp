@@ -12,6 +12,7 @@ from typing import Any, Dict
 from ..models.sensors.utilites import scan_com_ports
 from ..models.app_state import AppState
 from ..observers.base import Observer
+from ..services.client import ModbusRS485Client, SDI12Client, SensorProtocol
 
 
 class SensorSettingsFrame(tk.LabelFrame, Observer):
@@ -34,7 +35,7 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
         # Create the first label and combobox for the COM port
         self.client_com_port_label = ttk.Label(self, text="COM Port")
         self.client_com_port_box = ttk.Combobox(self, state="readonly")
-        
+
         self.update_com_ports()
         self.client_com_port_box.bind("<Button-1>", self.update_com_ports)
 
@@ -52,14 +53,26 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
         self.client_parity_combobox = ttk.Combobox(self, width=5, state="disable")
         self.client_baudrate_label = ttk.Label(self, text="Baudrate")
         self.client_baudrate_combobox = ttk.Combobox(self, width=6, state="disable")
-        self.update_settings()
+        self.update_settings(settings="insolight")
 
+        # Create custom style for connect button
+        self.style = ttk.Style()
+        self.style.configure('Connect.TButton')
+        self.style.map('Connect.TButton', 
+            foreground=[
+                ('disabled', 'grey'),
+                ('active', 'white'),
+                # ('!disabled', 'black')
+            ]
+        )
+        
         # Create the connect button to connect to the client
         self.connect_button = ttk.Button(
             self,
             text="Connect",
             width=8,
-            command=lambda: self.app_state.notify(event_type="button_connect"),
+            command=self.handle_connect,
+            style="Connect.TButton",  # Use custom style
         )
 
     def layout_widgets(self):
@@ -89,18 +102,27 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
         )
         self.connect_button.grid(row=4, column=2, sticky="se", padx=10, pady=(0, 10))
 
-    def update_settings(self) -> None:
+    def update_settings(self, *, settings: str = "insolight") -> None:
         """
         Update the settings in the sensor settings combobox
         Called everytime a new sensor is selected
         """
+        custom_setting = {
+            "custom": {
+                "baudrate": 9600,
+                "b_values": [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200],
+                "parity": "N",
+                "p_values": ["N", "E", "O"],
+                "state": "readonly",
+            }
+        }
         self.settings = self.app_state.selected_sensor.settings
-        print("Settings updated:", self.settings)
+        self.settings.update(custom_setting)
         if self.settings is None:
             # log_message(level="debug", message="No settings found for the selected sensor")
             return
         self.sensor_settings_combobox.configure(values=list(self.settings.keys()))
-        self.sensor_settings_combobox.set("insolight")
+        self.sensor_settings_combobox.set(settings)
         self.select_bus_settings()
 
     def update_com_ports(self, event=None) -> None:
@@ -116,7 +138,6 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
         """
         Fetch the corresponding settings and set them in the parity and baudrate comboboxes
         """
-        print("Selecting bus settings")
         if self.settings is not None:
             selected_bus = self.sensor_settings_combobox.get()
             if selected_bus == "custom":
@@ -135,6 +156,35 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
                 state=self.settings[selected_bus]["state"]
             )
 
+    def handle_connect(self, data: dict | None = None) -> None:
+        """
+        Handle the connect button click event
+        """
+        print("Handling connect...")
+        if data is None:
+            data = {"new_baudrate": int(self.client_baudrate_combobox.get()),
+                    "new_parity": self.client_parity_combobox.get()}
+        print(data)
+        if self.app_state.client is not None:
+            self.app_state.client = None
+            return
+        if self.app_state.selected_sensor is not None:
+            if self.app_state.selected_sensor.protocol == SensorProtocol.MODBUS:
+                self.app_state.client = ModbusRS485Client(
+                    port=self.client_com_port_box.get(),
+                    baudrate=data["new_baudrate"],
+                    parity=data["new_parity"],
+                    sensor=self.app_state.selected_sensor,
+                    timeout=1,
+                )
+            elif self.app_state.selected_sensor.protocol == SensorProtocol.SDI_12:
+                self.app_state.client = SDI12Client(
+                    port=self.client_com_port_box.get(),
+                    baudrate=data["new_baudrate"],
+                    parity=data["new_parity"],
+                    sensor=self.app_state.selected_sensor,
+                )
+
     def update_event(self, event_type: str, data: Any = None) -> None:
         """
         Update the SensorSettingsFrame based on the event type
@@ -144,3 +194,41 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
             self.update_settings()
         elif event_type == "sensor_settings_changed":
             self.select_bus_settings()
+        elif event_type == "client_connected" or event_type == "client_disconnected":
+            self.connect_button.configure(text="Disconnect" if self.app_state.is_client_connected else "Connect", command=self.handle_connect, state="normal")
+            self.client_com_port_box.configure(state="disable" if self.app_state.is_client_connected else "readonly")
+            self.sensor_settings_combobox.configure(state="disable" if self.app_state.is_client_connected else "readonly")
+        elif event_type == "verifying_current_id":
+            self.connect_button.configure(text="Verifying ID", state="disabled")
+        elif event_type == "fetching_slave_id" or event_type == "current_id_valid":
+            self.connect_button.configure(text="Disconnect", state="normal")
+        elif event_type == "slave_id_fetched":
+            print(f"data received in SensorSettingsFrame: {data.get('slave_id')}")
+            self.app_state.slave_id = data.get("slave_id")
+        elif event_type == "slave_id_fetch_error":
+            self.connect_button.configure(text="Connect", state="normal")
+            self.app_state.slave_id = None
+            self.app_state.client = None
+        elif event_type == "reboot_required":
+            self.app_state.client = None
+
+        elif event_type == "apply_sensor_settings":
+            print("Reconnecting client with new settings...")
+            # self.app_state.client = None
+            # self.handle_connect(data=data)
+            settings: str = "custom"
+            if data["new_baudrate"] == 9600 and data["new_parity"] == "N":
+                settings = "insolight"
+            elif self.app_state.selected_sensor is not None and "factory" in self.app_state.selected_sensor.settings.keys():
+                if (
+                    self.app_state.selected_sensor.settings["factory"]["baudrate"] == data["new_baudrate"]
+                    and self.app_state.selected_sensor.settings["factory"]["parity"] == data["new_parity"]
+                ):
+                    settings = "factory"
+            self.update_settings(settings=settings)
+            if settings == "custom":
+                self.client_baudrate_combobox.set(data["new_baudrate"])
+                self.client_parity_combobox.set(data["new_parity"])
+
+            self.app_state.notify(event_type="reboot_required", data={})
+

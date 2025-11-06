@@ -50,7 +50,7 @@ class ApogeeRadiationFrost(Sensor):
     def can_broadcast_setup(self) -> bool:
         return True
 
-    def get_current_slave_id(self, client) -> int:
+    def get_current_slave_id(self, *, client, slave_id: int=0) -> int:
         return 1
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:

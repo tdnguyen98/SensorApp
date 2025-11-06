@@ -23,3 +23,5 @@ start = "python -m src.sensorapp.main"
 
 [tool.pixi.dependencies]
 pymodbus = "3.5.4.*"
+tqdm = ">=4.67.1,<5"
+progress = ">=1.6.1,<2"
