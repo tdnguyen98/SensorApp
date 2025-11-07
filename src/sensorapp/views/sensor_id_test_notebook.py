@@ -149,15 +149,14 @@ class TestLogFrame(ttk.Frame):
 
 
 class SensorTestFrame(ttk.Frame):
-    def __init__(self, parent, open_test_frame: Callable):
+    def __init__(self, parent, app_state: AppState):
         super().__init__(parent)
-        self.open_test_frame = open_test_frame
+        self.app_state = app_state
+
 
         self.rowconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
         self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=1)
+
 
         # Create the widgets for the Test Selection frame
         self.create_widgets()
@@ -167,43 +166,27 @@ class SensorTestFrame(ttk.Frame):
         """
         Create the widgets for the Test Selection frame
         """
-        # Create the widgets for the Test Selection frame
-        self.validate_label = ttk.Label(
-            self,
-            text=(
-                "If you changed the settings/ID of the sensor, please restart the sensor and tick to continue."
-            ),
-        )
-        self.validate_restart_button = ttk.Checkbutton(self, command=self.on_tick)
-        self.validate_restart_button.state(["!alternate"])
-
-        # Create the log for the Test Selection frame
-        self.log_sensor = tk.Text(
-            self, height=10, width=30, state="disabled", wrap="word"
-        )
-        self.test_button = ttk.Button(
-            self, text="Test sensor", command=self.open_test_frame
-        )
+        self.log_text = tk.Text(self, height=5, state="disabled", wrap="word")
 
     def layout_widgets(self):
         """
         Layout the widgets for the Test Selection frame
         """
         # Layout the widgets for the Test Selection frame
-        self.validate_label.grid(row=0, column=0, sticky="sw", padx=10, pady=10)
-        self.validate_restart_button.grid(
-            row=0, column=1, padx=10, pady=10, sticky="sw"
-        )
+        self.log_text.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        # self.validate_restart_button.grid(
+        #     row=0, column=1, padx=10, pady=10, sticky="sw"
+        # )
 
-    def on_tick(self, event=None) -> None:  # pylint: disable=unused-argument
-        """
-        Tick the checkbutton to continue
-        """
-        if self.validate_restart_button.instate(["selected"]):
-            self.test_button.grid(row=1, column=0, sticky="sw")
-        else:
-            self.log_sensor.grid_remove()
-            self.test_button.grid_remove()
+    # def on_tick(self, event=None) -> None:  # pylint: disable=unused-argument
+    #     """
+    #     Tick the checkbutton to continue
+    #     """
+    #     if self.validate_restart_button.instate(["selected"]):
+    #         self.test_button.grid(row=1, column=0, sticky="sw")
+    #     else:
+    #         self.log_sensor.grid_remove()
+    #         self.test_button.grid_remove()
 
 
 class SensorIdTestNoteBook(ttk.Notebook, Observer):
@@ -220,7 +203,7 @@ class SensorIdTestNoteBook(ttk.Notebook, Observer):
 
         # Initially disable the tabs until the client is connected
         self.tab(0, state="disabled")
-        # self.tab(1, state="disabled")
+        self.tab(1, state="disabled")
 
     def create_widgets(self):
         """
@@ -228,18 +211,37 @@ class SensorIdTestNoteBook(ttk.Notebook, Observer):
         """
         # Create the frames for the Sensor ID and Test Selection tabs
         self.sensor_id_frame = SensorIdFrame(self, app_state=self.app_state)
-        # self.sensor_test_frame = SensorTestFrame(self, self.open_test_frame)
+        self.sensor_test_frame = SensorTestFrame(self, app_state=self.app_state)
 
         # Add the frames to the notebook
         self.add(self.sensor_id_frame, text="Sensor Configuration")
-        # self.add(self.sensor_test_frame, text="Test Selection")
-        # self.bind("<<NotebookTabChanged>>", self.on_tab_change)
+        self.add(self.sensor_test_frame, text="Test Selection")
+        self.bind("<<NotebookTabChanged>>", self.on_tab_change)
+
+    def on_tab_change(self, event):
+        selected = self.select()
+        if selected:
+            selected_index = self.index(selected)
+            self.app_state.notify(
+                event_type="tab_configure_test_changed", 
+                data={"selected_tab": selected_index}
+            )
 
     def update_event(self, event_type, data=None):
         if event_type == "current_id_valid" or event_type == "slave_id_fetched":
             self.tab(0, state="normal")
             self.select(0)
-            # self.tab(1, state="normal")
+            self.tab(1, state="normal")
         elif event_type == "client_disconnected":
             self.tab(0, state="disabled")
-            # self.tab(1, state="disabled")
+            self.tab(1, state="disabled")
+        elif event_type == "tab_configure_test_changed":
+            current_tab = data["selected_tab"] if data else 0
+            self.app_state.test_sensor(tab=current_tab)
+            self.update_idletasks()
+        elif event_type == "sensor_test_success":
+            self.sensor_test_frame.log_text.configure(state="normal")
+            self.sensor_test_frame.log_text.delete(1.0, tk.END)
+            for key, value in data['data'].items():
+                self.sensor_test_frame.log_text.insert(tk.END, f"{key}: {value}\n")
+            self.sensor_test_frame.log_text.configure(state="disabled")

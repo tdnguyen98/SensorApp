@@ -191,6 +191,7 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
         """
         print(f"SensorSettingsFrame received event: {event_type} with data: {data}")
         if event_type == "selected_sensor_changed":
+            self.app_state.restart_missing = False
             self.update_settings()
         elif event_type == "sensor_settings_changed":
             self.select_bus_settings()

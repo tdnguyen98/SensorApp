@@ -33,6 +33,9 @@ class AppState(Subject):
         self._fetch_thread = None
         self._client_lock = threading.Lock()
 
+        self._cancel_test = threading.Event()
+        self._test_thread = None
+
         self.selected_sensor = fetch_sensors_list()[0]
         self.queue = queue.Queue()
 
@@ -127,9 +130,56 @@ class AppState(Subject):
                     return
             self._queue_notify(event_type="slave_id_fetch_error", data={})
 
+    def test_sensor_thread(self):
+        """Test the sensor using the current client and selected sensor."""
+        self._cancel_test.clear()
+        if (
+            self._client is not None
+            and self._selected_sensor is not None
+        ):
+            while not self._cancel_test.is_set():
+                with self._client_lock:
+                    try:
+                        data = self._selected_sensor.read_sensor(
+                            client=self._client.client, slave_id=self._slave_id
+                        )
+                        if self._cancel_test.is_set():
+                            self._queue_notify(event_type="sensor_test_cancelled", data={})
+                            return
+                        self._queue_notify(
+                            event_type="sensor_test_success", data={"data": data}
+                        )
+                    except ModbusException as e:
+                        if self._cancel_test.is_set():
+                            self._queue_notify(event_type="sensor_test_cancelled", data={})
+                            return
+                        print(f"ModbusException during sensor test: {e}")
+                        self._queue_notify(
+                            event_type="sensor_test_failure", data={"error_message": str(e)}
+                        )
+                time.sleep(1)
+
     def cancel_fetch(self):
         """Cancel the ongoing slave ID fetch operation."""
         self._cancel_fetch.set()
+
+    def cancel_test(self):
+        """Cancel the ongoing sensor test operation."""
+        self._cancel_test.set()
+
+    def test_sensor(self, tab: int):
+        """Start the sensor test thread."""
+        if tab == 0:
+            self.cancel_test()
+            if self._test_thread is not None and self._test_thread.is_alive():
+                self._test_thread.join()
+            return
+        else:
+            if self._test_thread is None or not self._test_thread.is_alive():
+                self._test_thread = threading.Thread(
+                    target=self.test_sensor_thread, daemon=True
+                )
+                self._test_thread.start()
 
     ########################################################################
     #                          GETTERS & SETTERS                           #
@@ -144,19 +194,25 @@ class AppState(Subject):
     def client(self, value: SerialClient | None):
         # If disconnecting, cancel any ongoing operations first
         if value is None and self._client is not None:
-            # Cancel fetch before disconnecting
             self.notify(event_type="cancelling ID fetch", data={})
-            # Step 1: Signal threads to stop
+            # Signal threads to stop
             self.cancel_fetch()
+            self.cancel_test()
 
-            # Step 2: Wait for threads to finish (with timeout)
+            # Wait for threads to finish
             if self._fetch_thread is not None and self._fetch_thread.is_alive():
                 print("Waiting for fetch thread to stop...")
                 self._fetch_thread.join(timeout=2.0)
                 if self._fetch_thread.is_alive():
                     print("Warning: Fetch thread did not stop in time")
 
-            # Step 3: Acquire lock and safely close client
+            if self._test_thread is not None and self._test_thread.is_alive():
+                print("Waiting for test thread to stop...")
+                self._test_thread.join(timeout=2.0)
+                if self._test_thread.is_alive():
+                    print("Warning: Test thread did not stop in time")
+
+            # Acquire lock and safely close client
             with self._client_lock:
                 old_client = self._client
                 self._client = None  # Set to None FIRST so threads see it's gone
@@ -170,7 +226,7 @@ class AppState(Subject):
                     except (OSError, Exception) as e:
                         print(f"Error disconnecting client: {e}")
 
-            # Step 4: Update state
+            # Update state
             self.is_client_connected = False
             self.notify(event_type="client_disconnected", data={})
 

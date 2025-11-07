@@ -46,7 +46,7 @@ class LoggingFrame(ttk.Frame, Observer):
         Create the Text widget for displaying logs
         """
         # Create a read-only Text widget for displaying logs
-        self.log_status_text = tk.Text(self, height=2, state="disabled", wrap="word")
+        self.log_status_text = tk.Text(self, height=1, state="disabled", wrap="word")
         self.log_status_text.configure(font=tkFont.Font(family="Consolas", size=14))
         # Create color tags for the log_status_text widget
         self.log_status_text.tag_configure(
