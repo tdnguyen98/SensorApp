@@ -54,4 +54,25 @@ class ApogeeRadiationFrost(Sensor):
         return 1
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
-        return {"temperature": 22}
+    def setup_sensor(
+        self,
+        *,
+        client,
+        current_slave_id: int,
+        new_slave_id: int,
+        **kwargs,
+    ):
+        if isinstance(client, serial.Serial):
+            try:
+                client.reset_input_buffer()
+                client.reset_output_buffer()
+                command = f"{chr(current_slave_id)}A{chr(new_slave_id)}!".encode("ascii")
+                client.write(command)
+                time.sleep(0.5)
+                if client.in_waiting > 0:
+                    response = client.read(client.in_waiting).decode("ascii")
+                    log_message(level="INFO", message=f"SDI-12 setup response: {response}")
+                return
+            except serial.SerialException as e:
+                log_message(level="ERROR", message=f"Error setting up SDI-12 sensor: {e}")
+        raise RuntimeError("Client is not a valid serial connection.")

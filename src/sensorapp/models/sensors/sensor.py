@@ -61,8 +61,7 @@ class Sensor(ABC):
         client,
         current_slave_id: int,
         new_slave_id: int,
-        new_baudrate: int = 9600,
-        new_parity: str = "N",
+        **kwargs,
     ):
         pass
 
