@@ -227,7 +227,7 @@ class SensorIdTestNoteBook(ttk.Notebook, Observer):
                 data={"selected_tab": selected_index}
             )
 
-    def update_event(self, event_type, data=None):
+    def update_event(self, event_type, **kwargs) -> None:
         if event_type == "current_id_valid" or event_type == "slave_id_fetched":
             self.tab(0, state="normal")
             self.select(0)
@@ -236,12 +236,12 @@ class SensorIdTestNoteBook(ttk.Notebook, Observer):
             self.tab(0, state="disabled")
             self.tab(1, state="disabled")
         elif event_type == "tab_configure_test_changed":
-            current_tab = data["selected_tab"] if data else 0
+            current_tab = kwargs.get("selected_tab", 0)
             self.app_state.test_sensor(tab=current_tab)
             self.update_idletasks()
         elif event_type == "sensor_test_success":
             self.sensor_test_frame.log_text.configure(state="normal")
             self.sensor_test_frame.log_text.delete(1.0, tk.END)
-            for key, value in data['data'].items():
+            for key, value in kwargs.items():
                 self.sensor_test_frame.log_text.insert(tk.END, f"{key}: {value}\n")
             self.sensor_test_frame.log_text.configure(state="disabled")

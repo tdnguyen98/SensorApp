@@ -1,13 +1,12 @@
 # observers/base.py
 from abc import ABC, abstractmethod
-from typing import Any
 
 
 class Observer(ABC):
     @abstractmethod
-    def update_event(self, event_type: str, data: Any = None) -> None:
+    def update_event(self, event_type: str, **kwargs) -> None:
         """Receive update when notification is sent from Subject."""
-        pass
+
 
 class Subject:
     def __init__(self):
@@ -20,6 +19,6 @@ class Subject:
     def detach(self, *, observer: Observer) -> None:
         self._observers.remove(observer)
 
-    def notify(self, *, event_type: str, data: dict = {}) -> None:
+    def notify(self, *, event_type: str, **kwargs) -> None:
         for observer in self._observers:
-            observer.update_event(event_type=event_type, data=data)
+            observer.update_event(event_type=event_type, **kwargs)

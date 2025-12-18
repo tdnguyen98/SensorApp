@@ -152,7 +152,7 @@ class LoggingFrame(ttk.Frame, Observer):
         self.log_status_text.config(state="disabled")
         self.after(100, lambda: self.update_status_display_fetching_id(settings))
 
-    def update_event(self, event_type: str, data: Any = None) -> None:
+    def update_event(self, event_type: str, **kwargs) -> None:
         """
         Observer pattern - react to AppState events
         This is where automatic logging happens!
@@ -193,7 +193,7 @@ class LoggingFrame(ttk.Frame, Observer):
             },
         }
         if event_type == "error":
-            error_message = data["error_message"] if data else "Unknown error"
+            error_message = kwargs.get("error_message", "Unknown error")
             log_message(level="error", message=error_message)
         if event_type == "button_debug":
             # Toggle debug mode in AppState
@@ -232,9 +232,7 @@ class LoggingFrame(ttk.Frame, Observer):
                 self._spinner_running = False  # ← Sets flag to False
                 self.after_cancel(self._spinner_after_id)  # ← Cancels scheduled after() callback
                 # time.sleep(0.1)  # ← Waits 100ms
-            message = "Fetching slave ID..."
-            if data is not None:
-                message = f"Fetching slave ID {data.get('slave_id', '')}/255..."
+            message = f"Fetching slave ID {kwargs.get('slave_id', '?')}/255..."
             self.start_spinner(message)
             return
 
@@ -243,12 +241,10 @@ class LoggingFrame(ttk.Frame, Observer):
                 self._spinner_running = False  # ← Sets flag to False
                 self.after_cancel(self._spinner_after_id)  # ← Cancels scheduled after() callback
                 # time.sleep(0.1)  # ← Waits 100ms
-            message = "Verifying current slave ID..."
-            if data is not None:
-                message = f"Verifying current slave ID {data.get('slave_id')}/255..."
+            message = f"Verifying current slave ID {kwargs.get('slave_id', '?')}/255..."
             self.start_spinner(message)
             return
-        
+
         if event_type == "current_id_valid":
             self.stop_spinner("Current slave ID is valid")
             if self.app_state.client is not None:

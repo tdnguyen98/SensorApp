@@ -44,28 +44,30 @@ class AppState(Subject):
         try:
             while True:
                 event_type, data = self.queue.get_nowait()
-                self.notify(event_type=event_type, data=data)
+                self.notify(event_type=event_type, **data)
         except queue.Empty:
             pass
 
-    def _queue_notify(self, event_type: str, data: dict = {}):
+    def _queue_notify(self, event_type: str, **kwargs) -> None:
         """Thread-safe way to queue notifications from background threads."""
-        self.queue.put((event_type, data))
+        self.queue.put((event_type, kwargs))
 
     def fetch_slave_id_thread(self):
         """Fetch the slave ID using the current client and selected sensor."""
         self._cancel_fetch.clear()
         if self.slave_id is not None:
             self._queue_notify(
-                event_type="verifying_current_id", data={"slave_id": self.slave_id}
+                event_type="verifying_current_id", slave_id=self.slave_id
             )
             if self.test_current_id():
-                self._queue_notify(event_type="current_id_valid", data={"slave_id": self.slave_id})
+                self._queue_notify(
+                    event_type="current_id_valid", slave_id=self.slave_id
+                )
                 return
         if self.restart_missing:
-            self._queue_notify(event_type="reboot_required", data={})
+            self._queue_notify(event_type="reboot_required")
             return
-        self._queue_notify(event_type="fetching_slave_id", data={})
+        self._queue_notify(event_type="fetching_slave_id")
         self.fetch_sensor_id()
 
     def test_current_id(self) -> bool:
@@ -81,7 +83,7 @@ class AppState(Subject):
             with self._client_lock:
                 if self._client is None or self._cancel_fetch.is_set():
                     self._queue_notify(
-                        event_type="slave_id_invalid", data={"slave_id": self._slave_id}
+                        event_type="slave_id_invalid", slave_id=self._slave_id
                     )
                     return False
                 try:
@@ -89,12 +91,12 @@ class AppState(Subject):
                         client=self._client.client, slave_id=self._slave_id
                     )
                     self._queue_notify(
-                        event_type="slave_id_valid", data={"slave_id": self._slave_id}
+                        event_type="slave_id_valid", slave_id=self._slave_id
                     )
                     return True
                 except ModbusException:
                     self._queue_notify(
-                        event_type="slave_id_invalid", data={"slave_id": self._slave_id}
+                        event_type="slave_id_invalid", slave_id=self._slave_id
                     )
                     print(f"ModbusException: Slave ID {self._slave_id} is invalid.")
                     return False
@@ -106,10 +108,10 @@ class AppState(Subject):
             slave_id: int = 0
             for s_id in range(0, 255):
                 if self._cancel_fetch.is_set():
-                    self._queue_notify(event_type="slave_id_fetch_cancelled", data={})
+                    self._queue_notify(event_type="slave_id_fetch_cancelled")
                     return
                 self._queue_notify(
-                    event_type="fetching_slave_id", data={"slave_id": s_id}
+                    event_type="fetching_slave_id", slave_id=s_id
                 )
                 with self._client_lock:
                     try:
@@ -119,16 +121,16 @@ class AppState(Subject):
                     except OSError as e:
                         print(f"OSError during slave ID fetch: {e}")
                         self._queue_notify(
-                            event_type="slave_id_fetch_cancelled", data={}
+                            event_type="slave_id_fetch_cancelled"
                         )
                         return
 
                 if slave_id != -1:
                     self._queue_notify(
-                        event_type="slave_id_fetched", data={"slave_id": slave_id}
+                        event_type="slave_id_fetched", slave_id=slave_id
                     )
                     return
-            self._queue_notify(event_type="slave_id_fetch_error", data={})
+            self._queue_notify(event_type="slave_id_fetch_error")
 
     def test_sensor_thread(self):
         """Test the sensor using the current client and selected sensor."""
@@ -258,7 +260,9 @@ class AppState(Subject):
         elif isinstance(value, Sensor):
             self._selected_sensor = value
             sensor_name = value.sensor_name
-        self.notify(event_type="selected_sensor_changed", data={"sensor_name": sensor_name})
+        self.notify(
+            event_type="selected_sensor_changed", sensor_name=sensor_name
+        )
 
     @property
     def slave_id(self) -> int | None:
@@ -268,7 +272,7 @@ class AppState(Subject):
     @slave_id.setter
     def slave_id(self, value: int | None):
         self._slave_id = value
-        self.notify(event_type="slave_id_changed", data={})
+        self.notify(event_type="slave_id_changed")
 
     @property
     def is_client_connected(self) -> bool:
@@ -287,13 +291,13 @@ class AppState(Subject):
     @debug_mode.setter
     def debug_mode(self, value: bool):
         self._debug_mode = value
-        self.notify(event_type="debug_mode_changed", data={})
+        self.notify(event_type="debug_mode_changed")
 
     @property
     def restart_missing(self) -> bool:
         """Get the current restart missing flag."""
         return self._restart_missing
-    
+
     @restart_missing.setter
     def restart_missing(self, value: bool):
         self._restart_missing = value

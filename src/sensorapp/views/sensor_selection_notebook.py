@@ -6,8 +6,6 @@ import tkinter as tk
 import tkinter.font as tkFont
 from tkinter import ttk
 
-from typing import Any
-
 from ..observers.base import Observer
 
 from ..models.app_state import AppState
@@ -159,19 +157,14 @@ class SensorSelectionNoteBook(ttk.Notebook, Observer):
         """
         Notify the app state that the tab has changed to update the notebook
         """
-        data = None
-        # If the user switch to the Color Codes tab, add flag to update the wires colors
-        if self.index(self.select()) == 1:
-            data = "Color Codes"
-        self.app_state.notify(event_type="sensor_tab_changed", data=data)
+        self.app_state.notify(event_type="sensor_tab_changed")
 
-    def update_event(self, event_type: str, data: Any = None) -> None:
+    def update_event(self, event_type: str, **kwargs) -> None:
         """
         Receive update when notification is sent from Subject.
         """
         if event_type == "sensor_tab_changed":
-            if data == "Color Codes":
-                self.update_color_wires()
+            self.update_color_wires()
             self.update_idletasks()
         elif event_type == "client_connected" or event_type == "client_disconnected":
             state = "disabled" if self.app_state.is_client_connected else "readonly"

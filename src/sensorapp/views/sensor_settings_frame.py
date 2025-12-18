@@ -185,27 +185,34 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
                     sensor=self.app_state.selected_sensor,
                 )
 
-    def update_event(self, event_type: str, data: Any = None) -> None:
+    def update_event(self, event_type: str, **kwargs) -> None:
         """
         Update the SensorSettingsFrame based on the event type
         """
-        print(f"SensorSettingsFrame received event: {event_type} with data: {data}")
         if event_type == "selected_sensor_changed":
             self.app_state.restart_missing = False
             self.update_settings()
         elif event_type == "sensor_settings_changed":
             self.select_bus_settings()
         elif event_type == "client_connected" or event_type == "client_disconnected":
-            self.connect_button.configure(text="Disconnect" if self.app_state.is_client_connected else "Connect", command=self.handle_connect, state="normal")
-            self.client_com_port_box.configure(state="disable" if self.app_state.is_client_connected else "readonly")
-            self.sensor_settings_combobox.configure(state="disable" if self.app_state.is_client_connected else "readonly")
+            self.connect_button.configure(
+                text="Disconnect" if self.app_state.is_client_connected else "Connect",
+                command=self.handle_connect,
+                state="normal",
+            )
+            self.client_com_port_box.configure(
+                state="disable" if self.app_state.is_client_connected else "readonly"
+            )
+            self.sensor_settings_combobox.configure(
+                state="disable" if self.app_state.is_client_connected else "readonly"
+            )
         elif event_type == "verifying_current_id":
             self.connect_button.configure(text="Verifying ID", state="disabled")
         elif event_type == "fetching_slave_id" or event_type == "current_id_valid":
             self.connect_button.configure(text="Disconnect", state="normal")
         elif event_type == "slave_id_fetched":
-            print(f"data received in SensorSettingsFrame: {data.get('slave_id')}")
-            self.app_state.slave_id = data.get("slave_id")
+            print(f"data received in SensorSettingsFrame: {kwargs.get('slave_id')}")
+            self.app_state.slave_id = kwargs.get("slave_id")
         elif event_type == "slave_id_fetch_error":
             self.connect_button.configure(text="Connect", state="normal")
             self.app_state.slave_id = None
@@ -215,21 +222,28 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
 
         elif event_type == "apply_sensor_settings":
             print("Reconnecting client with new settings...")
-            # self.app_state.client = None
-            # self.handle_connect(data=data)
             settings: str = "custom"
-            if data["new_baudrate"] == 9600 and data["new_parity"] == "N":
+            if (
+                self.app_state.selected_sensor is not None
+                and self.app_state.selected_sensor.protocol == SensorProtocol.SDI_12
+            ):
+                settings = "SDI-12"
+            if kwargs["new_baudrate"] == 9600 and kwargs["new_parity"] == "N":
                 settings = "insolight"
-            elif self.app_state.selected_sensor is not None and "factory" in self.app_state.selected_sensor.settings.keys():
+            elif (
+                self.app_state.selected_sensor is not None
+                and "factory" in self.app_state.selected_sensor.settings.keys()
+            ):
                 if (
-                    self.app_state.selected_sensor.settings["factory"]["baudrate"] == data["new_baudrate"]
-                    and self.app_state.selected_sensor.settings["factory"]["parity"] == data["new_parity"]
+                    self.app_state.selected_sensor.settings["factory"]["baudrate"]
+                    == kwargs["new_baudrate"]
+                    and self.app_state.selected_sensor.settings["factory"]["parity"]
+                    == kwargs["new_parity"]
                 ):
                     settings = "factory"
             self.update_settings(settings=settings)
             if settings == "custom":
-                self.client_baudrate_combobox.set(data["new_baudrate"])
-                self.client_parity_combobox.set(data["new_parity"])
+                self.client_baudrate_combobox.set(kwargs["new_baudrate"])
+                self.client_parity_combobox.set(kwargs["new_parity"])
 
-            self.app_state.notify(event_type="reboot_required", data={})
-
+            self.app_state.notify(event_type="reboot_required")
