@@ -1,4 +1,5 @@
 """Application state management using the Observer pattern."""
+
 import time
 import threading
 import queue
@@ -6,8 +7,8 @@ import queue
 from pymodbus.exceptions import ModbusException
 
 from ..observers.base import Subject
-from .sensors.sensor import Sensor, SENSOR_REGISTRY, fetch_sensors_list
-from ..services.client import SerialClient
+from .sensors.sensor import Sensor, SENSOR_REGISTRY, fetch_sensors_list, SensorProtocol
+from ..services.client import SDI12Client, SerialClient
 
 
 class AppState(Subject):
@@ -19,8 +20,7 @@ class AppState(Subject):
         - selected sensor
         - serial client
     """
-
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._selected_sensor: Sensor
         self._slave_id: int | None = None
@@ -30,14 +30,16 @@ class AppState(Subject):
         self._restart_missing: bool = False
 
         self._cancel_fetch = threading.Event()
-        self._fetch_thread = None
+        self._fetch_thread: threading.Thread | None = None
         self._client_lock = threading.Lock()
 
         self._cancel_test = threading.Event()
-        self._test_thread = None
+        self._test_thread: threading.Thread | None = None
+        self._test_thread_sdi12: threading.Thread | None = None
 
-        self.selected_sensor = fetch_sensors_list()[0]
-        self.queue = queue.Queue()
+        sensor_name = fetch_sensors_list()[0]
+        self.selected_sensor = SENSOR_REGISTRY[sensor_name]()
+        self.queue: queue.Queue[tuple[str, dict]] = queue.Queue()
 
     def check_queue(self):
         """Check the queue for any messages and process them."""
@@ -135,30 +137,82 @@ class AppState(Subject):
     def test_sensor_thread(self):
         """Test the sensor using the current client and selected sensor."""
         self._cancel_test.clear()
-        if (
-            self._client is not None
-            and self._selected_sensor is not None
-        ):
+        if self._client is not None and self._selected_sensor is not None:
             while not self._cancel_test.is_set():
                 with self._client_lock:
-                    try:
-                        data = self._selected_sensor.read_sensor(
-                            client=self._client.client, slave_id=self._slave_id
-                        )
-                        if self._cancel_test.is_set():
-                            self._queue_notify(event_type="sensor_test_cancelled", data={})
-                            return
+                    client = self._client
+                    sensor = self._selected_sensor
+                    slave_id = self._slave_id
+                   # Check if we have valid objects (outside the lock)
+                if client is None or sensor is None or slave_id is None:
+                    self._queue_notify(event_type="sensor_test_cancelled")
+                    return
+                
+                # Perform I/O operation WITHOUT holding the lock
+                try:
+                    data = sensor.read_sensor(
+                        client=client.client, slave_id=slave_id
+                    )
+                    
+                    if self._cancel_test.is_set():
+                        self._queue_notify(event_type="sensor_test_cancelled")
+                        return
+                    
+                    self._queue_notify(event_type="sensor_test_success", **data)
+                except ModbusException as e:
+                    if self._cancel_test.is_set():
                         self._queue_notify(
-                            event_type="sensor_test_success", data={"data": data}
+                            event_type="sensor_test_cancelled"
                         )
-                    except ModbusException as e:
-                        if self._cancel_test.is_set():
-                            self._queue_notify(event_type="sensor_test_cancelled", data={})
-                            return
-                        print(f"ModbusException during sensor test: {e}")
+                        return
+                    print(f"ModbusException during sensor test: {e}")
+                    self._queue_notify(
+                        event_type="sensor_test_failure",
+                        error_message=str(e),
+                    )
+                time.sleep(1)
+
+    def test_sensor_thread_sdi12(self):
+        """Test the SDI-12 sensor using the current client and selected sensor."""
+        self._cancel_test.clear()
+        if self._client is not None and self._selected_sensor is not None:
+            while not self._cancel_test.is_set():
+                with self._client_lock:
+                    client = self._client
+                    sensor = self._selected_sensor
+                    slave_id = self._slave_id
+                   # Check if we have valid objects (outside the lock)
+                if client is None or sensor is None or slave_id is None:
+                    self._queue_notify(event_type="sensor_test_cancelled")
+                    return
+                
+                # Perform I/O operation WITHOUT holding the lock
+                try:
+                    sensor.request_to_take_measurements(
+                        client=client.client, slave_id=slave_id
+                    )
+                    if self._cancel_test.is_set():
+                        self._queue_notify(event_type="sensor_test_cancelled")
+                        return
+                    data = sensor.read_sensor(
+                        client=client.client, slave_id=slave_id
+                    )
+                    if self._cancel_test.is_set():
+                        self._queue_notify(event_type="sensor_test_cancelled")
+                        return
+                    
+                    self._queue_notify(event_type="sensor_test_success", **data)
+                except Exception as e:
+                    if self._cancel_test.is_set():
                         self._queue_notify(
-                            event_type="sensor_test_failure", data={"error_message": str(e)}
+                            event_type="sensor_test_cancelled"
                         )
+                        return
+                    print(f"Exception during SDI-12 sensor test: {e}")
+                    self._queue_notify(
+                        event_type="sensor_test_failure",
+                        error_message=str(e),
+                    )
                 time.sleep(1)
 
     def cancel_fetch(self):
@@ -173,15 +227,23 @@ class AppState(Subject):
         """Start the sensor test thread."""
         if tab == 0:
             self.cancel_test()
-            if self._test_thread is not None and self._test_thread.is_alive():
-                self._test_thread.join()
+            if isinstance(self._test_thread, threading.Thread) and self._test_thread.is_alive():
+                self._test_thread.join(timeout=2.0)
+                if self._test_thread.is_alive():
+                    print("Warning: Test thread did not stop in time")
             return
         else:
             if self._test_thread is None or not self._test_thread.is_alive():
-                self._test_thread = threading.Thread(
-                    target=self.test_sensor_thread, daemon=True
-                )
-                self._test_thread.start()
+                if isinstance(self._client, SDI12Client):
+                    self._test_thread_sdi12 = threading.Thread(
+                        target=self.test_sensor_thread_sdi12, daemon=True
+                    )
+                    self._test_thread_sdi12.start()
+                else:
+                    self._test_thread = threading.Thread(
+                        target=self.test_sensor_thread, daemon=True
+                    )
+                    self._test_thread.start()
 
     ########################################################################
     #                          GETTERS & SETTERS                           #
@@ -195,55 +257,99 @@ class AppState(Subject):
     @client.setter
     def client(self, value: SerialClient | None):
         # If disconnecting, cancel any ongoing operations first
+
         if value is None and self._client is not None:
-            self.notify(event_type="cancelling ID fetch", data={})
-            # Signal threads to stop
-            self.cancel_fetch()
-            self.cancel_test()
+            if self._client.protocol == SensorProtocol.MODBUS:
+                self.disconnect_modbus_client()
 
-            # Wait for threads to finish
-            if self._fetch_thread is not None and self._fetch_thread.is_alive():
-                print("Waiting for fetch thread to stop...")
-                self._fetch_thread.join(timeout=2.0)
-                if self._fetch_thread.is_alive():
-                    print("Warning: Fetch thread did not stop in time")
+            elif self._client.protocol == SensorProtocol.SDI_12:
+                self.cancel_test()
+                if self._test_thread is not None and self._test_thread.is_alive():
+                    print("Waiting for test thread to stop...")
+                    self._test_thread.join(timeout=2.0)
+                    if self._test_thread.is_alive():
+                        print("Warning: Test thread did not stop in time")
+                # Acquire lock and safely close client
+                with self._client_lock:
+                    old_client = self._client
+                    self._client = None  # Set to None FIRST so threads see it's gone
 
-            if self._test_thread is not None and self._test_thread.is_alive():
-                print("Waiting for test thread to stop...")
-                self._test_thread.join(timeout=2.0)
-                if self._test_thread.is_alive():
-                    print("Warning: Test thread did not stop in time")
-
-            # Acquire lock and safely close client
-            with self._client_lock:
-                old_client = self._client
-                self._client = None  # Set to None FIRST so threads see it's gone
-
-                # Now safe to disconnect
-                if old_client is not None:
-                    try:
-                        print("Closing serial connection...")
-                        old_client.disconnect()
-                        print("Serial connection closed")
-                    except (OSError, Exception) as e:
-                        print(f"Error disconnecting client: {e}")
-
-            # Update state
+                    # Now safe to disconnect
+                    if old_client is not None:
+                        try:
+                            print("Closing serial connection...")
+                            old_client.disconnect()
+                            print("Serial connection closed")
+                        except OSError as e:
+                            print(f"Error disconnecting client: {e}")
             self.is_client_connected = False
-            self.notify(event_type="client_disconnected", data={})
+            self.notify(event_type="client_disconnected")
 
         # If connecting
         elif value is not None:
             print("Setting new client")
-            with self._client_lock:
-                print("Client lock acquired")
-                self._client = value
-                self.is_client_connected = True
-                self.notify(event_type="client_connected", data={})
-            self._fetch_thread = threading.Thread(
-                target=self.fetch_slave_id_thread, daemon=True
-            )
-            self._fetch_thread.start()
+            if value.protocol == SensorProtocol.MODBUS:
+                self.connect_modbus_client(value=value)
+            elif value.protocol == SensorProtocol.SDI_12:
+                self.connect_sdi12_client(value=value)
+
+    def disconnect_modbus_client(self):
+        """Disconnect the Modbus client."""
+        # Signal threads to stop
+        self.cancel_fetch()
+        self.cancel_test()
+
+        # Wait for threads to finish
+        if self._fetch_thread.is_alive():
+            print("Waiting for fetch thread to stop...")
+            self._fetch_thread.join(timeout=2.0)
+            if self._fetch_thread.is_alive():
+                print("Warning: Fetch thread did not stop in time")
+
+        if self._test_thread is not None and self._test_thread.is_alive():
+            print("Waiting for test thread to stop...")
+            self._test_thread.join(timeout=2.0)
+            if self._test_thread.is_alive():
+                print("Warning: Test thread did not stop in time")
+
+        # Acquire lock and safely close client
+        with self._client_lock:
+            old_client = self._client
+            self._client = None  # Set to None FIRST so threads see it's gone
+
+            # Now safe to disconnect
+            if old_client is not None:
+                try:
+                    print("Closing serial connection...")
+                    old_client.disconnect()
+                    print("Serial connection closed")
+                except OSError as e:
+                    print(f"Error disconnecting client: {e}")
+
+    def connect_modbus_client(self, *, value: SerialClient):
+        """Connect the Modbus client."""
+        with self._client_lock:
+            print("Client lock acquired")
+            self._client = value
+            self.is_client_connected = True
+            self.notify(event_type="client_connected")
+        self._fetch_thread = threading.Thread(
+            target=self.fetch_slave_id_thread, daemon=True
+        )
+        self._fetch_thread.start()
+
+    def connect_sdi12_client(self, *, value: SerialClient):
+        """Connect the SDI-12 client."""
+        self._client = value
+        self.is_client_connected = True
+        self.notify(event_type="client_connected")
+        if isinstance(self._client, SDI12Client):
+            self.slave_id = self._client.fetch_id()
+            print("Fetched slave ID:", self.slave_id)
+            if self.slave_id is not None:
+                self.notify(
+                    event_type="SDI_12_slave_id_fetched", slave_id=self.slave_id
+                )
 
     @property
     def selected_sensor(self) -> Sensor:

@@ -2,7 +2,10 @@
 This is the library for the SDI-12 sensors.
 Each sensor type has it's own class with it's own methods.
 """
-
+import serial
+import time
+import re
+from ...services.logging_system import log_message
 from .sensor import (
     Sensor,
     register_sensor,
@@ -22,20 +25,14 @@ class ApogeeRadiationFrost(Sensor):
         return [
             WireColorConfiguration(label="V+", color="red"),
             WireColorConfiguration(label="Ground", color="black"),
-            WireColorConfiguration(label="SDI-12 Data", color="white"),
+            WireColorConfiguration(label="SDI-12", color="white"),
         ]
 
     @property
     def settings(self):
         return {
-            "insolight": {
+            "SDI-12": {
                 "baudrate": 1200,
-                "parity": "N",
-                "state": "disable",
-            },
-            "factory": {
-                "slave_id": 1,
-                "baudrate": 19200,
                 "parity": "E",
                 "state": "disable",
             },
@@ -45,15 +42,52 @@ class ApogeeRadiationFrost(Sensor):
         return False
 
     def can_broadcast_read(self) -> bool:
-        return True
+        return False
 
     def can_broadcast_setup(self) -> bool:
-        return True
+        return False
 
-    def get_current_slave_id(self, *, client, slave_id: int=0) -> int:
+    def try_current_slave_id(self, *, client, slave_id: int=0) -> int:
         return 1
 
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
+        if isinstance(client, serial.Serial):
+            try:
+                command = f"{chr(slave_id)}D0!".encode("ascii")
+                client.write(command)
+                time.sleep(0.5)
+                if client.in_waiting > 0:
+                    response = client.read(client.in_waiting).decode("ascii").strip()
+                    if len(response) > 1:
+                        data_part = response[1:]  # Remove address
+                        # Find all numbers (with + or - signs)
+                        values = re.findall(r'[+-]?\d*\.?\d+', data_part)
+                        parsed_values = [float(v) for v in values]
+                        measurements = {'temperature': parsed_values[0]}
+                        return measurements
+                    else:
+                        log_message(level="ERROR", message="No data received from SDI-12 sensor.")
+            except serial.SerialException as e:
+                log_message(level="ERROR", message=f"Error reading from SDI-12 sensor: {e}")
+                return {}
+        raise RuntimeError("Client is not a valid serial connection.")
+    
+    def request_to_take_measurements(self, *, client, slave_id: int=0) -> None:
+        """Sends the command to the SDI-12 sensor to take measurements."""
+        if isinstance(client, serial.Serial):
+            try:
+                client.reset_input_buffer()
+                client.reset_output_buffer()
+                command = f"{chr(slave_id)}M!".encode("ascii")
+                client.write(command)
+                time.sleep(0.5)
+                if client.in_waiting > 0:
+                    client.read(client.in_waiting).decode("ascii").strip()
+                return
+            except serial.SerialException as e:
+                log_message(level="ERROR", message=f"Error requesting measurements from SDI-12 sensor: {e}")
+        raise RuntimeError("Client is not a valid serial connection.")
+
     def setup_sensor(
         self,
         *,

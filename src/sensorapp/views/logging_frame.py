@@ -6,14 +6,15 @@ of the app.
 import tkinter as tk
 import tkinter.font as tkFont
 from tkinter import ttk
-from typing import Any
+import time
 
 from ..services.logging_system import setup_logging, log_message
 from ..models.app_state import AppState
 from ..observers.base import Observer
+from ..services.client import SerialClient, SDI12Client
 
-import time
 class LoggingFrame(ttk.Frame, Observer):
+    """Frame for displaying logs in the application."""
     def __init__(self, parent, *, app_state: AppState):
         super().__init__(parent)
         self.app_state = app_state
@@ -21,6 +22,7 @@ class LoggingFrame(ttk.Frame, Observer):
         self._spinner_step = 0
         self._spinner_running = True
         self._spinner_after_id = None
+        self._spinner_message: str = ""
         # Set up logging with the custom handler for the log_text widget
         setup_logging(self.log_message)
 
@@ -38,8 +40,6 @@ class LoggingFrame(ttk.Frame, Observer):
         self.log_text.tag_configure("error", foreground="red")
 
         self.update_status_display(["Disconnected"])
-
-        
 
     def create_logging_widgets(self):
         """
@@ -110,11 +110,11 @@ class LoggingFrame(ttk.Frame, Observer):
                 " " * 5
                 + f"Sensor: {self.app_state.selected_sensor.sensor_name}"
                 + " " * 5
-                + f"baudrate: {settings[1]}"
+                + f"baudrate: {settings[0]}"
                 + " " * 5
-                + f"parity: {settings[2]}"
+                + f"parity: {settings[1]}"
                 + " " * 5
-                + f"slave ID: {self.app_state.slave_id}",
+                + f"slave ID: {chr(self.app_state.slave_id) if isinstance(self.app_state.client, SDI12Client) and self.app_state.slave_id is not None else self.app_state.slave_id}",
                 "default",
             )
         else:
@@ -130,7 +130,7 @@ class LoggingFrame(ttk.Frame, Observer):
         """
         if not self._spinner_running:
             return
-        spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         spinner_char = spinners[self._spinner_step % len(spinners)]
         if self.app_state.is_client_connected:
             self.log_status_text.config(state="normal")
@@ -142,9 +142,9 @@ class LoggingFrame(ttk.Frame, Observer):
                 " " * 5
                 + f"Sensor: {self.app_state.selected_sensor.sensor_name}"
                 + " " * 5
-                + f"baudrate: {settings[1]}"
+                + f"baudrate: {settings[0]}"
                 + " " * 5
-                + f"parity: {settings[2]}"
+                + f"parity: {settings[1]}"
                 + " " * 5
                 + f"slave ID: {spinner_char}",
                 "default",
@@ -175,18 +175,18 @@ class LoggingFrame(ttk.Frame, Observer):
                 "level": "warning",
                 "message": "Slave ID fetch cancelled.",
             },
-            "slave_id_changed": {
-                "level": "info",
-                "message": f"Slave ID changed to: {self.app_state.slave_id}",
+            "slave_id_fetch_error": {
+                "level": "error",
+                "message": "Error fetching slave ID.",
             },
-           "slave_id_fetch_error": {
-               "level": "error",
-               "message": "Error fetching slave ID.",
-           },
-           "apply_sensor_settings": {
-               "level": "info",
-               "message": "Sensor settings successfully changed, reconnecting client.",
-           },
+            "apply_sensor_settings": {
+                "level": "info",
+                "message": "Sensor settings successfully changed, reconnecting client.",
+            },
+            "apply_sensor_settings_sdi12": {
+                "level": "info",
+                "message": "SDI-12 sensor settings successfully changed",
+            },
             "reboot_required": {
                 "level": "warning",
                 "message": "Sensor reboot required. Please reboot the sensor for changes to take effect before reconnecting.",
@@ -211,12 +211,14 @@ class LoggingFrame(ttk.Frame, Observer):
         # Handle connection status display
         if event_type == "client_connected":
             # if self.app_state.slave_id is not None:
-            self.update_status_display(
+            if isinstance(self.app_state.client, SerialClient):
+                self.update_status_display(
                     [
-                        "insolight",
                         str(self.app_state.client.baudrate),
                         self.app_state.client.parity,
-                        self.app_state.slave_id if self.app_state.slave_id is not None else "N/A",
+                        str(self.app_state.slave_id)
+                        if self.app_state.slave_id is not None
+                        else "N/A",
                     ]
                 )
             return
@@ -224,13 +226,15 @@ class LoggingFrame(ttk.Frame, Observer):
         elif event_type == "client_disconnected":
             self.update_status_display(["Disconnected"])
             if self._spinner_running:
-                self.stop_spinner("Cancelled")
+                self.stop_spinner()
             return
 
         if event_type == "fetching_slave_id":
             if self._spinner_running and self._spinner_after_id is not None:
                 self._spinner_running = False  # ← Sets flag to False
-                self.after_cancel(self._spinner_after_id)  # ← Cancels scheduled after() callback
+                self.after_cancel(
+                    self._spinner_after_id
+                )  # ← Cancels scheduled after() callback
                 # time.sleep(0.1)  # ← Waits 100ms
             message = f"Fetching slave ID {kwargs.get('slave_id', '?')}/255..."
             self.start_spinner(message)
@@ -239,7 +243,9 @@ class LoggingFrame(ttk.Frame, Observer):
         if event_type == "verifying_current_id":
             if self._spinner_running and self._spinner_after_id is not None:
                 self._spinner_running = False  # ← Sets flag to False
-                self.after_cancel(self._spinner_after_id)  # ← Cancels scheduled after() callback
+                self.after_cancel(
+                    self._spinner_after_id
+                )  # ← Cancels scheduled after() callback
                 # time.sleep(0.1)  # ← Waits 100ms
             message = f"Verifying current slave ID {kwargs.get('slave_id', '?')}/255..."
             self.start_spinner(message)
@@ -250,34 +256,36 @@ class LoggingFrame(ttk.Frame, Observer):
             if self.app_state.client is not None:
                 self.update_status_display(
                     [
-                        "insolight",
                         str(self.app_state.client.baudrate),
                         self.app_state.client.parity,
-                        self.app_state.slave_id if self.app_state.slave_id is not None else "N/A",
+                        str(self.app_state.slave_id)
+                        if self.app_state.slave_id is not None
+                        else "N/A",
                     ]
                 )
             return
 
         if event_type == "slave_id_changed" or event_type == "slave_id_valid":
-            self.stop_spinner("Slave ID fetched")
+            if self._spinner_running:
+                self.stop_spinner("Slave ID fetched")
             self.app_state.restart_missing = False
             if self.app_state.client is not None:
                 self.update_status_display(
                     [
-                        "insolight",
                         str(self.app_state.client.baudrate),
                         self.app_state.client.parity,
-                        self.app_state.slave_id if self.app_state.slave_id is not None else "N/A",
+                        str(self.app_state.slave_id)
+                        if self.app_state.slave_id is not None
+                        else "N/A",
                     ]
                 )
             return
-        
+
         if event_type == "slave_id_invalid":
             self.stop_spinner("Slave ID invalid")
             if self.app_state.client is not None:
                 self.update_status_display(
                     [
-                        "insolight",
                         str(self.app_state.client.baudrate),
                         self.app_state.client.parity,
                         "Invalid",
@@ -292,27 +300,33 @@ class LoggingFrame(ttk.Frame, Observer):
             level = log_config["level"]
             log_message(level=level, message=message)
 
-    def start_spinner(self, message: str, duration_ms: int = 5000):
+    def start_spinner(self, message: str):
         """Start a non-blocking spinner animation."""
         print("Starting spinner...")
         self._spinner_message = message
         self._spinner_running = True
         self._animate_spinner()
-        self.update_status_display_fetching_id(["Insolight", str(self.app_state.client.baudrate),
-                        self.app_state.client.parity])
-        
+        if isinstance(self.app_state.client, SerialClient):
+            self.update_status_display_fetching_id(
+                [
+                    "Insolight",
+                    str(self.app_state.client.baudrate),
+                    self.app_state.client.parity,
+                ]
+            )
+
         # Auto-stop after duration
         # self.after(duration_ms, self.stop_spinner)
-    
+
     def _animate_spinner(self):
         """Animate the spinner (called repeatedly via after())."""
         if not self._spinner_running:
             return
-        
-        spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+
+        spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         spinner_char = spinners[self._spinner_step % len(spinners)]
         message_with_spinner = f"{self._spinner_message} {spinner_char}"
-        
+
         # Update spinner display
         self.log_text.config(state="normal")
         try:
@@ -321,30 +335,31 @@ class LoggingFrame(ttk.Frame, Observer):
                 self.log_text.delete("end-2l", "end-1l")
         except tk.TclError:
             pass
-        
-        self.log_text.insert(tk.END, message_with_spinner + '\n', 'info')
-        self.log_text.config(state='disabled')
+
+        self.log_text.insert(tk.END, message_with_spinner + "\n", "info")
+        self.log_text.config(state="disabled")
         self.log_text.see(tk.END)
-        
+
         self._spinner_step += 1
         # Schedule next animation frame
         self._spinner_after_id = self.after(100, self._animate_spinner)
-    
+
     def stop_spinner(self, completion_message: str = ""):
         """Stop the spinner and show completion."""
         self._spinner_running = False
-        if completion_message == "":
-            time.sleep(0.2)
-            return
         self.log_text.config(state="normal")
-        spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         try:
             last_line = self.log_text.get("end-2l", "end-1l")
             if any(char in last_line for char in spinners):
                 self.log_text.delete("end-2l", "end-1l")
         except tk.TclError:
             pass
-        
-        self.log_text.insert(tk.END, completion_message + '\n', 'info')
-        self.log_text.config(state='disabled')
+
+        if completion_message == "":
+            time.sleep(0.2)
+            return
+
+        self.log_text.insert(tk.END, completion_message + "\n", "info")
+        self.log_text.config(state="disabled")
         self.log_text.see(tk.END)

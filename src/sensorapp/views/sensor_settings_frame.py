@@ -57,15 +57,16 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
 
         # Create custom style for connect button
         self.style = ttk.Style()
-        self.style.configure('Connect.TButton')
-        self.style.map('Connect.TButton', 
+        self.style.configure("Connect.TButton")
+        self.style.map(
+            "Connect.TButton",
             foreground=[
-                ('disabled', 'grey'),
-                ('active', 'white'),
+                ("disabled", "grey"),
+                ("active", "white"),
                 # ('!disabled', 'black')
-            ]
+            ],
         )
-        
+
         # Create the connect button to connect to the client
         self.connect_button = ttk.Button(
             self,
@@ -102,7 +103,7 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
         )
         self.connect_button.grid(row=4, column=2, sticky="se", padx=10, pady=(0, 10))
 
-    def update_settings(self, *, settings: str = "insolight") -> None:
+    def update_settings(self, *, settings: str = "") -> None:
         """
         Update the settings in the sensor settings combobox
         Called everytime a new sensor is selected
@@ -117,15 +118,18 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
             }
         }
         self.settings = self.app_state.selected_sensor.settings
-        self.settings.update(custom_setting)
         if self.settings is None:
             # log_message(level="debug", message="No settings found for the selected sensor")
             return
+        if self.settings.get("SDI-12") is None:
+            self.settings.update(custom_setting)
         self.sensor_settings_combobox.configure(values=list(self.settings.keys()))
+        if not settings:
+            settings = list(self.settings.keys())[0]
         self.sensor_settings_combobox.set(settings)
         self.select_bus_settings()
 
-    def update_com_ports(self, event=None) -> None:
+    def update_com_ports(self, event=None) -> None:  # pylint: disable=unused-argument
         """
         Update the COM port list in the client_com_port Combobox
         """
@@ -162,8 +166,10 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
         """
         print("Handling connect...")
         if data is None:
-            data = {"new_baudrate": int(self.client_baudrate_combobox.get()),
-                    "new_parity": self.client_parity_combobox.get()}
+            data = {
+                "new_baudrate": int(self.client_baudrate_combobox.get()),
+                "new_parity": self.client_parity_combobox.get(),
+            }
         print(data)
         if self.app_state.client is not None:
             self.app_state.client = None
