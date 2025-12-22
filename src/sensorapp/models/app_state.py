@@ -20,6 +20,7 @@ class AppState(Subject):
         - selected sensor
         - serial client
     """
+
     def __init__(self) -> None:
         super().__init__()
         self._selected_sensor: Sensor
@@ -112,9 +113,7 @@ class AppState(Subject):
                 if self._cancel_fetch.is_set():
                     self._queue_notify(event_type="slave_id_fetch_cancelled")
                     return
-                self._queue_notify(
-                    event_type="fetching_slave_id", slave_id=s_id
-                )
+                self._queue_notify(event_type="fetching_slave_id", slave_id=s_id)
                 with self._client_lock:
                     try:
                         slave_id = self._selected_sensor.try_current_slave_id(
@@ -122,15 +121,11 @@ class AppState(Subject):
                         )
                     except OSError as e:
                         print(f"OSError during slave ID fetch: {e}")
-                        self._queue_notify(
-                            event_type="slave_id_fetch_cancelled"
-                        )
+                        self._queue_notify(event_type="slave_id_fetch_cancelled")
                         return
 
                 if slave_id != -1:
-                    self._queue_notify(
-                        event_type="slave_id_fetched", slave_id=slave_id
-                    )
+                    self._queue_notify(event_type="slave_id_fetched", slave_id=slave_id)
                     return
             self._queue_notify(event_type="slave_id_fetch_error")
 
@@ -143,27 +138,23 @@ class AppState(Subject):
                     client = self._client
                     sensor = self._selected_sensor
                     slave_id = self._slave_id
-                   # Check if we have valid objects (outside the lock)
+                # Check if we have valid objects (outside the lock)
                 if client is None or sensor is None or slave_id is None:
                     self._queue_notify(event_type="sensor_test_cancelled")
                     return
-                
+
                 # Perform I/O operation WITHOUT holding the lock
                 try:
-                    data = sensor.read_sensor(
-                        client=client.client, slave_id=slave_id
-                    )
-                    
+                    data = sensor.read_sensor(client=client.client, slave_id=slave_id)
+
                     if self._cancel_test.is_set():
                         self._queue_notify(event_type="sensor_test_cancelled")
                         return
-                    
+
                     self._queue_notify(event_type="sensor_test_success", **data)
                 except ModbusException as e:
                     if self._cancel_test.is_set():
-                        self._queue_notify(
-                            event_type="sensor_test_cancelled"
-                        )
+                        self._queue_notify(event_type="sensor_test_cancelled")
                         return
                     print(f"ModbusException during sensor test: {e}")
                     self._queue_notify(
@@ -181,11 +172,11 @@ class AppState(Subject):
                     client = self._client
                     sensor = self._selected_sensor
                     slave_id = self._slave_id
-                   # Check if we have valid objects (outside the lock)
+                # Check if we have valid objects (outside the lock)
                 if client is None or sensor is None or slave_id is None:
                     self._queue_notify(event_type="sensor_test_cancelled")
                     return
-                
+
                 # Perform I/O operation WITHOUT holding the lock
                 try:
                     sensor.request_to_take_measurements(
@@ -194,19 +185,15 @@ class AppState(Subject):
                     if self._cancel_test.is_set():
                         self._queue_notify(event_type="sensor_test_cancelled")
                         return
-                    data = sensor.read_sensor(
-                        client=client.client, slave_id=slave_id
-                    )
+                    data = sensor.read_sensor(client=client.client, slave_id=slave_id)
                     if self._cancel_test.is_set():
                         self._queue_notify(event_type="sensor_test_cancelled")
                         return
-                    
+
                     self._queue_notify(event_type="sensor_test_success", **data)
                 except Exception as e:
                     if self._cancel_test.is_set():
-                        self._queue_notify(
-                            event_type="sensor_test_cancelled"
-                        )
+                        self._queue_notify(event_type="sensor_test_cancelled")
                         return
                     print(f"Exception during SDI-12 sensor test: {e}")
                     self._queue_notify(
@@ -227,7 +214,10 @@ class AppState(Subject):
         """Start the sensor test thread."""
         if tab == 0:
             self.cancel_test()
-            if isinstance(self._test_thread, threading.Thread) and self._test_thread.is_alive():
+            if (
+                isinstance(self._test_thread, threading.Thread)
+                and self._test_thread.is_alive()
+            ):
                 self._test_thread.join(timeout=2.0)
                 if self._test_thread.is_alive():
                     print("Warning: Test thread did not stop in time")
@@ -366,9 +356,7 @@ class AppState(Subject):
         elif isinstance(value, Sensor):
             self._selected_sensor = value
             sensor_name = value.sensor_name
-        self.notify(
-            event_type="selected_sensor_changed", sensor_name=sensor_name
-        )
+        self.notify(event_type="selected_sensor_changed", sensor_name=sensor_name)
 
     @property
     def slave_id(self) -> int | None:
