@@ -649,38 +649,13 @@ class KippZonenRT1(ModbusSensor):
         new_slave_id: int,
         **kwargs,
     ):
-        print(
-            f"setting up sensor with new_slave_id={new_slave_id}, new_baudrate={kwargs.get('new_baudrate', 9600)}, new_parity={kwargs.get('new_parity', 'N')}"
-        )
-        write_register(
-            client=client, address=213, value=new_slave_id, slave_id=current_slave_id
-        )
-        print("Slave ID set.")
-        new_parity = kwargs.get("new_parity", "N")
-        new_baudrate = kwargs.get("new_baudrate", 9600)
-        if new_parity == "N":
-            parity_value = 0
-        elif new_parity == "O":
-            parity_value = 1
-        else:
-            parity_value = 2
-        write_registers(
-            client=client,
-            address=209,
-            values=[new_baudrate, parity_value],
-            slave_id=current_slave_id,
-        )
-        print("Baudrate set.")
-        # write_registers(
-        #     client=client, address=210, values=parity_value, slave_id=current_slave_id
-        # )
-        print("Parity set.")
+        print("Missing setup implementation for Kipp&Zonen RT1")
 
     def try_current_slave_id(self, *, client, slave_id: int = 0) -> int:
         try:
-            slave_id = read_holding_registers(
+            read_input_registers(
                 client=client, address=0, count=1, slave_id=slave_id
-            ).slave_id
+            )
         except ModbusException:
             return -1
         return slave_id
