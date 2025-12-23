@@ -108,21 +108,10 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
         Update the settings in the sensor settings combobox
         Called everytime a new sensor is selected
         """
-        custom_setting = {
-            "custom": {
-                "baudrate": 9600,
-                "b_values": [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200],
-                "parity": "N",
-                "p_values": ["N", "E", "O"],
-                "state": "readonly",
-            }
-        }
         self.settings = self.app_state.selected_sensor.settings
         if self.settings is None:
             # log_message(level="debug", message="No settings found for the selected sensor")
             return
-        if self.settings.get("SDI-12") is None:
-            self.settings.update(custom_setting)
         self.sensor_settings_combobox.configure(values=list(self.settings.keys()))
         if not settings:
             settings = list(self.settings.keys())[0]

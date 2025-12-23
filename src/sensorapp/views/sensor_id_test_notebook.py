@@ -38,24 +38,17 @@ class SensorIdFrame(ttk.Frame):
         self.new_baudrate_combobox = ttk.Combobox(
             self,
             width=5,
-            values=[
-                "1200",
-                "2400",
-                "4800",
-                "9600",
-                "19200",
-                "38400",
-                "57600",
-                "115200",
-            ],
+            values=["9600"],
             state="readonly",
         )
-        self.new_baudrate_combobox.set("9600")
         self.new_parity_label = ttk.Label(self, text="New parity")
         self.new_parity_combobox = ttk.Combobox(
-            self, width=5, values=["N", "E", "O"], state="readonly"
+            self, width=5, values=["N"], state="readonly"
         )
+
+        self.new_baudrate_combobox.set("9600")
         self.new_parity_combobox.set("N")
+
         self.new_slave_id_label = ttk.Label(self, text="New slave ID")
         self.new_slave_id_text = ttk.Entry(self, width=5)
         self.apply_button = ttk.Button(
@@ -201,8 +194,6 @@ class SensorIdFrameSdi12(ttk.Frame):
         Change the sensor ID for SDI-12 sensors
         """
         new_id = self.new_slave_id_text.get()
-        print(f"Changing SDI-12 sensor ID to: {new_id}")
-        print(f"new id size: {len(new_id)}")
         if new_id == "" or len(new_id) != 1 or re.match(r"[^0-9a-zA-Z]", new_id):
             self.app_state.notify(
                 event_type="error",
@@ -302,6 +293,26 @@ class SensorIdTestNoteBook(ttk.Notebook, Observer):
             self.tab(0, state="normal")
             self.select(0)
             self.tab(1, state="normal")
+            if self.app_state.selected_sensor.settings.get("custom") is not None:
+                self.sensor_id_frame.new_baudrate_combobox.configure(
+                    values=self.app_state.selected_sensor.settings["custom"][
+                        "b_values"
+                    ],
+                    state="readonly",
+                )
+                self.sensor_id_frame.new_parity_combobox.configure(
+                    values=self.app_state.selected_sensor.settings["custom"][
+                        "p_values"
+                    ],
+                    state="readonly",
+                )
+            else:
+                self.sensor_id_frame.new_baudrate_combobox.configure(
+                    values=["9600"], state="disabled"
+                )
+                self.sensor_id_frame.new_parity_combobox.configure(
+                    values=["N"], state="disabled"
+                )
         elif event_type == "SDI_12_slave_id_fetched":
             self.switch_to_sdi12_frame()
             self.tab(0, state="normal")

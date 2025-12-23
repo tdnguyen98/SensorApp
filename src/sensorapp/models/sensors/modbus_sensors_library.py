@@ -225,6 +225,13 @@ class ApogeePar(ModbusSensor):
                 "parity": "E",
                 "state": "disable",
             },
+            "custom": {
+                "baudrate": 9600,
+                "b_values": [9600, 19200, 38400, 57600, 115200],
+                "parity": "N",
+                "p_values": ["N", "E", "O"],
+                "state": "readonly",
+            },
         }
 
     def needs_power_cycle_before_setup(self) -> bool:
@@ -250,13 +257,13 @@ class ApogeePar(ModbusSensor):
         parity = {"N": 0, "O": 1, "E": 2}[kwargs.get("new_parity", "N")]
 
         write_registers(
-            client=client, address=0x33, values=baud, slave_id=current_slave_id
+            client=client,
+            address=0x33,
+            values=[baud, parity],
+            slave_id=current_slave_id,
         )
-        write_registers(
-            client=client, address=0x34, values=parity, slave_id=current_slave_id
-        )
-        write_registers(
-            client=client, address=0x30, values=new_slave_id, slave_id=current_slave_id
+        write_register(
+            client=client, address=0x30, value=new_slave_id, slave_id=current_slave_id
         )
 
     def try_current_slave_id(self, *, client, slave_id: int = 0) -> int:
@@ -310,6 +317,13 @@ class ApogeeGhi(ModbusSensor):
                 "parity": "E",
                 "state": "disable",
             },
+            "custom": {
+                "baudrate": 9600,
+                "b_values": [9600, 19200, 38400, 57600, 115200],
+                "parity": "N",
+                "p_values": ["N", "E", "O"],
+                "state": "readonly",
+            },
         }
 
     def needs_power_cycle_before_setup(self) -> bool:
@@ -334,13 +348,13 @@ class ApogeeGhi(ModbusSensor):
         ]
         parity = {"N": 0, "O": 1, "E": 2}[kwargs.get("new_parity", "N")]
         write_registers(
-            client=client, address=0x33, values=baud, slave_id=current_slave_id
+            client=client,
+            address=0x33,
+            values=[baud, parity],
+            slave_id=current_slave_id,
         )
-        write_registers(
-            client=client, address=0x34, values=parity, slave_id=current_slave_id
-        )
-        write_registers(
-            client=client, address=0x30, values=new_slave_id, slave_id=current_slave_id
+        write_register(
+            client=client, address=0x30, value=new_slave_id, slave_id=current_slave_id
         )
 
     def try_current_slave_id(self, *, client, slave_id: int = 0) -> int:
@@ -386,6 +400,13 @@ class SeeedLeafWetness(ModbusSensor):
                 "parity": "N",
                 "state": "disable",
             },
+            "custom": {
+                "baudrate": 9600,
+                "b_values": [1200, 2400, 4800, 9600, 19200, 38400],
+                "parity": "N",
+                "p_values": ["N", "E", "O"],
+                "state": "readonly",
+            },
         }
 
     def needs_power_cycle_before_setup(self) -> bool:
@@ -405,8 +426,18 @@ class SeeedLeafWetness(ModbusSensor):
         new_slave_id: int,
         **kwargs,
     ):
+        baud = {38400: 0, 19200: 1, 9600: 2, 4800: 3, 2400: 4, 1200: 5}[
+            kwargs.get("new_baudrate", 9600)
+        ]
+        parity = {"N": 0, "E": 1, "O": 2}[kwargs.get("new_parity", "N")]
         write_register(
-            client=client, address=0x0200, value=new_slave_id, slave_id=current_slave_id
+            client=client, address=515, value=parity, slave_id=current_slave_id
+        )
+        write_registers(
+            client=client,
+            address=512,
+            values=[new_slave_id, baud],
+            slave_id=current_slave_id,
         )
 
     def try_current_slave_id(self, *, client, slave_id: int = 0) -> int:
@@ -456,6 +487,13 @@ class SeeedTH(ModbusSensor):
                 "parity": "N",
                 "state": "disable",
             },
+            "custom": {
+                "baudrate": 9600,
+                "b_values": [1200, 2400, 4800, 9600, 19200, 38400],
+                "parity": "N",
+                "p_values": ["N", "E", "O"],
+                "state": "readonly",
+            },
         }
 
     def needs_power_cycle_before_setup(self) -> bool:
@@ -475,8 +513,18 @@ class SeeedTH(ModbusSensor):
         new_slave_id: int,
         **kwargs,
     ):
+        baud = {38400: 0, 19200: 1, 9600: 2, 4800: 3, 2400: 4, 1200: 5}[
+            kwargs.get("new_baudrate", 9600)
+        ]
+        parity = {"N": 0, "E": 1, "O": 2}[kwargs.get("new_parity", "N")]
+        write_register(
+            client=client, address=515, value=parity, slave_id=current_slave_id
+        )
         write_registers(
-            client=client, address=512, values=new_slave_id, slave_id=current_slave_id
+            client=client,
+            address=512,
+            values=[new_slave_id, baud],
+            slave_id=current_slave_id,
         )
 
     def try_current_slave_id(self, *, client, slave_id: int = 0) -> int:
@@ -634,6 +682,13 @@ class KippZonenRT1(ModbusSensor):
                 "parity": "E",
                 "state": "disable",
             },
+            "custom": {
+                "baudrate": 9600,
+                "b_values": [1200, 2400, 4800, 9600, 19200, 38400],
+                "parity": "N",
+                "p_values": ["N", "E", "O"],
+                "state": "readonly",
+            },
         }
 
     def needs_power_cycle_before_setup(self) -> bool:
@@ -721,7 +776,7 @@ class RikaTest(ModbusSensor):
             },
             "custom": {
                 "baudrate": 9600,
-                "b_values": [9600, 19200, 38400, 57600, 115200],
+                "b_values": [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200],
                 "parity": "N",
                 "p_values": ["N", "E", "O"],
                 "state": "readonly",
