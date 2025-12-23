@@ -1,19 +1,22 @@
 """
 This file contains helper functions for reading and writing data from the modbus sensors.
 """
+import time
 
 from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
-from pymodbus.register_read_message import ReadHoldingRegistersResponse, ReadInputRegistersResponse
-from pymodbus.register_write_message import WriteSingleRegisterResponse, WriteMultipleRegistersResponse
+from pymodbus.register_read_message import (
+    ReadHoldingRegistersResponse,
+    ReadInputRegistersResponse,
+)
+from pymodbus.register_write_message import (
+    WriteSingleRegisterResponse,
+    WriteMultipleRegistersResponse,
+)
 from serial import Serial
 from serial.tools import list_ports
 
-import time
-
-def init_modbus_client(*, portname: str, baudrate: int, parity: str):
-    return ModbusClient(port=portname, stopbits=1, bytesize=8, baudrate=baudrate, parity=parity, timeout=0.4)
 
 
 def read_holding_registers(
@@ -43,7 +46,9 @@ def read_input_registers(
     return res
 
 
-def write_register(*, client: ModbusClient, address: int, value: int, slave_id: int) -> WriteSingleRegisterResponse:
+def write_register(
+    *, client: ModbusClient, address: int, value: int, slave_id: int
+) -> WriteSingleRegisterResponse:
     """Helper for writing a single register and checking for errors"""
     res = client.write_register(address=address, value=value, slave=slave_id)
     if isinstance(res, Exception):
@@ -73,6 +78,7 @@ def decode_f32(regs: list[int], pos: int, *, wordorder=Endian.LITTLE) -> float:
 
 
 def decode_big_endian_32bits(regs: list) -> float:
+    """Decode a big-endian 32-bit float"""
     return BinaryPayloadDecoder.fromRegisters(
         regs, byteorder=Endian.BIG, wordorder=Endian.BIG
     ).decode_32bit_float()
@@ -86,5 +92,7 @@ def write_serial(request: str, ser: Serial):
     print("RECV:", response)
     return response
 
+
 def scan_com_ports():
+    """Scans and returns a list of available COM ports"""
     return [port.device for port in list_ports.comports()]

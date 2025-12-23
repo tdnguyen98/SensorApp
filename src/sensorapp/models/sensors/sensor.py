@@ -1,11 +1,13 @@
 """
 Base sensor classes and unified registry system for all sensor types.
 """
+
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Type
 from enum import Enum
 
 from .wire_color import WireColorConfiguration
+
 
 class SensorProtocol(Enum):
     """Enum to identify sensor communication protocols."""
@@ -23,7 +25,7 @@ class Sensor(ABC):
     @property
     @abstractmethod
     def sensor_name(self) -> str:
-        pass
+        """Return the name of the sensor."""
 
     @property
     @abstractmethod
@@ -40,7 +42,7 @@ class Sensor(ABC):
     @property
     @abstractmethod
     def settings(self) -> Dict[str, Any]:
-        pass
+        """Return the available settings for the sensor."""
 
     @abstractmethod
     def needs_power_cycle_before_setup(self) -> bool:
@@ -63,15 +65,18 @@ class Sensor(ABC):
         new_slave_id: int,
         **kwargs,
     ):
-        pass
+        """Setup the sensor with the new slave ID and other settings (baudrate, parity)"""
 
     @abstractmethod
     def try_current_slave_id(self, *, client, slave_id: int = 0) -> int:
-        pass
+        """
+        Try to communicate with the sensor using the current slave ID.
+        Return the detected slave ID or raise an exception.
+        """
 
     @abstractmethod
     def read_sensor(self, client, slave_id) -> dict[str, int | float]:
-        pass
+        """Read the sensor measurement."""
 
 
 # Unified global registry for all sensor classes

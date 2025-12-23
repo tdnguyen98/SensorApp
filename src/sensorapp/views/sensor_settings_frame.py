@@ -16,6 +16,9 @@ from ..services.client import ModbusRS485Client, SDI12Client, SensorProtocol
 
 
 class SensorSettingsFrame(tk.LabelFrame, Observer):
+    """
+    Frame displaying the serial configurations for the selected sensor.
+    """
     def __init__(self, parent, *, app_state: AppState):
         super().__init__(parent)
         self.app_state = app_state
@@ -63,7 +66,6 @@ class SensorSettingsFrame(tk.LabelFrame, Observer):
             foreground=[
                 ("disabled", "grey"),
                 ("active", "white"),
-                # ('!disabled', 'black')
             ],
         )
 

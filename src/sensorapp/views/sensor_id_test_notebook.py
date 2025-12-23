@@ -14,6 +14,10 @@ from ..models.app_state import AppState
 
 
 class SensorIdFrame(ttk.Frame):
+    """
+    Frame displaying the available settings (baud, parity) for the sensor and new slave ID setup.
+    """
+
     def __init__(self, parent, app_state: AppState):
         super().__init__(parent)
         self.app_state = app_state
@@ -130,6 +134,7 @@ class SensorIdFrame(ttk.Frame):
 
 
 class SensorTestFrame(ttk.Frame):
+    """Frame displaying the log output of the sensor."""
     def __init__(self, parent, app_state: AppState):
         super().__init__(parent)
         self.app_state = app_state
@@ -159,6 +164,7 @@ class SensorTestFrame(ttk.Frame):
 
 
 class SensorIdFrameSdi12(ttk.Frame):
+    """Frame displaying the SDI-12 sensor ID setup."""
     def __init__(self, parent, app_state: AppState):
         super().__init__(parent)
         self.app_state = app_state
@@ -228,6 +234,11 @@ class SensorIdFrameSdi12(ttk.Frame):
 
 
 class SensorIdTestNoteBook(ttk.Notebook, Observer):
+    """
+    Notebook widget containing two tabs:
+        - Sensor ID configuration tab (Modbus or SDI-12)
+        - Sensor test selection tab
+    """
     def __init__(
         self,
         parent,
@@ -235,6 +246,7 @@ class SensorIdTestNoteBook(ttk.Notebook, Observer):
     ):
         super().__init__(parent)
         self.app_state = app_state
+        self.current_config_frame = "modbus"
 
         # Create the widgets for the Sensor ID and Test Selection frame
         self.create_widgets()
@@ -254,11 +266,11 @@ class SensorIdTestNoteBook(ttk.Notebook, Observer):
 
         # Add the frames to the notebook
         self.add(self.sensor_id_frame, text="Sensor Configuration")
-        self.current_config_frame = "modbus"
         self.add(self.sensor_test_frame, text="Test Selection")
         self.bind("<<NotebookTabChanged>>", self.on_tab_change)
 
     def on_tab_change(self, event):  # pylint: disable=unused-argument
+        """Handle tab change event between Sensor ID and Sensor Test frames"""
         selected = self.select()
         if selected:
             selected_index = self.index(selected)

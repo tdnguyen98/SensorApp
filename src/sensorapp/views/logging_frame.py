@@ -13,8 +13,10 @@ from ..models.app_state import AppState
 from ..observers.base import Observer
 from ..services.client import SerialClient, SDI12Client
 
+
 class LoggingFrame(ttk.Frame, Observer):
     """Frame for displaying logs in the application."""
+
     def __init__(self, parent, *, app_state: AppState):
         super().__init__(parent)
         self.app_state = app_state

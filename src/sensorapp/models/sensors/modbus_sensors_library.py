@@ -64,6 +64,7 @@ class ModbusSensor(Sensor):
 
 @register_sensor(name="Rika Par")
 class RikaPar(ModbusSensor):
+    """Rika Par"""
     @property
     def sensor_name(self) -> str:
         return "Rika Par"
@@ -129,6 +130,7 @@ class RikaPar(ModbusSensor):
 
 @register_sensor(name="Rika TH")
 class RikaTH(ModbusSensor):
+    """Rika Temperature and Humidity Sensor"""
     @property
     def sensor_name(self) -> str:
         return "Rika TH"
@@ -194,6 +196,7 @@ class RikaTH(ModbusSensor):
 
 @register_sensor(name="Apogee Par")
 class ApogeePar(ModbusSensor):
+    """Apogee pyranometer Models SP-422"""
     @property
     def sensor_name(self) -> str:
         return "Apogee Par"
@@ -286,6 +289,7 @@ class ApogeePar(ModbusSensor):
 
 @register_sensor(name="Apogee Ghi")
 class ApogeeGhi(ModbusSensor):
+    """Apogee Ghi Model SQ-522"""
     @property
     def sensor_name(self) -> str:
         return "Apogee Ghi"
@@ -377,6 +381,7 @@ class ApogeeGhi(ModbusSensor):
 
 @register_sensor(name="Seeed leaf wetness")
 class SeeedLeafWetness(ModbusSensor):
+    """Seeed Leaf Wetness and Temperature model S-YM-01"""
     @property
     def sensor_name(self) -> str:
         return "Seeed leaf wetness"
@@ -466,6 +471,7 @@ class SeeedLeafWetness(ModbusSensor):
 
 @register_sensor(name="Seeed T/H")
 class SeeedTH(ModbusSensor):
+    """Seeed Air Temperature and Humidity model S-TH-01"""
     @property
     def sensor_name(self) -> str:
         return "Seeed T/H"
@@ -568,6 +574,7 @@ class SeeedTH(ModbusSensor):
 
 @register_sensor(name="Campbell soil T/H")
 class CampbellSoilTH(ModbusSensor):
+    """Campbell Soil Temperature and Humidity TEROS 54"""
     @property
     def sensor_name(self) -> str:
         return "Campbell soil T/H"
@@ -656,6 +663,7 @@ class CampbellSoilTH(ModbusSensor):
 
 @register_sensor(name="Kipp&Zonen RT1")
 class KippZonenRT1(ModbusSensor):
+    """Kipp&Zonen RT1 Rooftop Monitoring System"""
     @property
     def sensor_name(self) -> str:
         return "Kipp&Zonen RT1"
@@ -743,11 +751,12 @@ class KippZonenRT1(ModbusSensor):
         }
 
 
-@register_sensor(name="Rika Test")
-class RikaTest(ModbusSensor):
+@register_sensor(name="Sensor Modbus Test")
+class SensorModbusTest(ModbusSensor):
+    """Sensor Modbus Test"""
     @property
     def sensor_name(self) -> str:
-        return "Rika Test"
+        return "Sensor Modbus Test"
 
     @property
     def wire_color_configurations(self):
