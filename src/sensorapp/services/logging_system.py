@@ -25,6 +25,7 @@ def setup_logging(log_message_func, debug=False):
 
     # Add the log_message function as a handler
     class FunctionHandler(logging.Handler):
+        """Custom logging handler that sends log messages to a provided function."""
         def __init__(self, log_message_func):
             super().__init__()
             self.log_message_func = log_message_func

@@ -1,23 +1,25 @@
 """This module provides a serial connection client for sensors using SDI-12 or Modbus protocols."""
 
-from abc import ABC, abstractmethod
-
-import serial
 import re
+
+from abc import ABC, abstractmethod
+import serial
 
 from pymodbus.client import ModbusSerialClient as ModbusClient
 from pymodbus.exceptions import ModbusException
-
-from ..models.sensors.sensor import Sensor, SensorProtocol
-
-from .logging_system import log_message
 
 # Import sensor libraries to register sensors
 import src.sensorapp.models.sensors.modbus_sensors_library  # This will register modbus sensors
 import src.sensorapp.models.sensors.sdi_12_sensors_library  # This will register SDI-12 sensors
 
+from ..models.sensors.sensor import Sensor, SensorProtocol
+
+from .logging_system import log_message
+
+
 
 class SerialClient(ABC):
+    """Base class for serial clients communicating with sensors."""
     def __init__(
         self,
         *,
@@ -42,11 +44,11 @@ class SerialClient(ABC):
 
     @abstractmethod
     def connect(self):
-        pass
+        """Create the client connection."""
 
     @abstractmethod
     def disconnect(self):
-        pass
+        """Close the client connection."""
 
     @abstractmethod
     def setup_sensor(
@@ -57,14 +59,11 @@ class SerialClient(ABC):
         new_baudrate: int = 9600,
         new_parity: str = "N",
     ):
-        pass
-
-    # @abstractmethod
-    # def read_data(self, *, id: int) -> dict[str, int | float] | None:
-    #     pass
+        """Setup the sensor with the new slave ID and other settings (baudrate, parity)"""
 
 
 class ModbusRS485Client(SerialClient):
+    """Modbus RTU over RS485 serial client for communicating with Modbus sensors."""
     def __init__(
         self,
         *,
@@ -125,6 +124,7 @@ class ModbusRS485Client(SerialClient):
         )
 
     def read_data(self, *, slave_id: int) -> dict[str, int | float] | None:
+        """Read measurement data from the sensor."""
         if not self.client:
             log_message(level="ERROR", message="Modbus client is not connected.")
             return None
@@ -147,6 +147,7 @@ class ModbusRS485Client(SerialClient):
 
 
 class SDI12Client(SerialClient):
+    """SDI-12 serial client for communicating with SDI-12 sensors."""
     def __init__(
         self, *, port: str, baudrate: int = 1200, parity: str = "E", sensor: Sensor
     ):
