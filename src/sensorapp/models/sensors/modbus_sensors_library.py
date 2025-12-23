@@ -244,7 +244,9 @@ class ApogeePar(ModbusSensor):
         new_slave_id: int,
         **kwargs,
     ):
-        baud = {115200: 0, 57600: 1, 38400: 2, 19200: 3, 9600: 4}[kwargs.get("new_baudrate", 9600)]
+        baud = {115200: 0, 57600: 1, 38400: 2, 19200: 3, 9600: 4}[
+            kwargs.get("new_baudrate", 9600)
+        ]
         parity = {"N": 0, "O": 1, "E": 2}[kwargs.get("new_parity", "N")]
 
         write_registers(
@@ -327,7 +329,9 @@ class ApogeeGhi(ModbusSensor):
         new_slave_id: int,
         **kwargs,
     ):
-        baud = {115200: 0, 57600: 1, 38400: 2, 19200: 3, 9600: 4}[kwargs.get("new_baudrate", 9600)]
+        baud = {115200: 0, 57600: 1, 38400: 2, 19200: 3, 9600: 4}[
+            kwargs.get("new_baudrate", 9600)
+        ]
         parity = {"N": 0, "O": 1, "E": 2}[kwargs.get("new_parity", "N")]
         write_registers(
             client=client, address=0x33, values=baud, slave_id=current_slave_id
@@ -649,13 +653,24 @@ class KippZonenRT1(ModbusSensor):
         new_slave_id: int,
         **kwargs,
     ):
-        print("Missing setup implementation for Kipp&Zonen RT1")
+        baudrate = kwargs.get("new_baudrate", 9600)
+        parity = {"N": 0, "E": 1, "O": 2}[kwargs.get("new_parity", "N")]
+        bytesize = 8
+        stopbits = 1
+        try:
+            client.write_coil(address=12, value=True, slave=current_slave_id)
+            client.write_registers(
+                address=209,
+                values=[baudrate, parity, bytesize, stopbits, new_slave_id],
+                slave=current_slave_id,
+            )
+            client.write_coil(address=16, value=True, slave=current_slave_id)
+        except ModbusException as exc:
+            raise exc
 
     def try_current_slave_id(self, *, client, slave_id: int = 0) -> int:
         try:
-            read_input_registers(
-                client=client, address=0, count=1, slave_id=slave_id
-            )
+            read_input_registers(client=client, address=0, count=1, slave_id=slave_id)
         except ModbusException:
             return -1
         return slave_id
@@ -664,7 +679,6 @@ class KippZonenRT1(ModbusSensor):
         radiation = read_holding_registers(
             client=client, address=5, count=1, slave_id=slave_id
         ).registers
-        print(radiation)
         temperature = read_holding_registers(
             client=client, address=8, count=1, slave_id=slave_id
         ).registers
