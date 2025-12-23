@@ -53,6 +53,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/wcwidth-0.2.14-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/yarl-1.20.1-pyhe1237c8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-h6491c7d_2.conda
+      - pypi: https://files.pythonhosted.org/packages/78/4d/9437e214780de833165f52728709e8a3130015fe536d4fbb3139f7353b3f/types_pyserial-3.5.0.20251001-py3-none-any.whl
       - pypi: .
 packages:
 - conda: https://conda.anaconda.org/conda-forge/noarch/aiohappyeyeballs-2.6.1-pyhd8ed1ab_0.conda
@@ -472,7 +473,9 @@ packages:
 - pypi: .
   name: sensorapp
   version: 0.1.0
-  sha256: eabbc6753d67c14f63904ce0be15ac444f168fe0236a75a9b476c9f64694a0de
+  sha256: 56741cc26185d6f3c4cdfa11b90fdae27939493546a1dc30075a972f2c723268
+  requires_dist:
+  - types-pyserial>=3.5.0.20251001,<4
   requires_python: '>=3.11'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/noarch/shellingham-1.5.4-pyhd8ed1ab_1.conda
@@ -551,6 +554,11 @@ packages:
   purls: []
   size: 5300
   timestamp: 1758635560770
+- pypi: https://files.pythonhosted.org/packages/78/4d/9437e214780de833165f52728709e8a3130015fe536d4fbb3139f7353b3f/types_pyserial-3.5.0.20251001-py3-none-any.whl
+  name: types-pyserial
+  version: 3.5.0.20251001
+  sha256: 334f9f1b5c122dcc3ce6a6142e46450cc80b684032d6ad333362077f191dea23
+  requires_python: '>=3.9'
 - conda: https://conda.anaconda.org/conda-forge/noarch/typing-extensions-4.15.0-h396c80c_0.conda
   sha256: 7c2df5721c742c2a47b2c8f960e718c930031663ac1174da67c1ed5999f7938c
   md5: edd329d7d3a4ab45dcf905899a7a6115
