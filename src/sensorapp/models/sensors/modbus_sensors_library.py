@@ -431,7 +431,7 @@ class SeeedLeafWetness(ModbusSensor):
         new_slave_id: int,
         **kwargs,
     ):
-        baud = {38400: 0, 19200: 1, 9600: 2, 4800: 3, 2400: 4, 1200: 5}[
+        baud = {1200: 0, 2400: 1, 4800: 2, 9600: 3, 19200: 4, 38400: 5}[
             kwargs.get("new_baudrate", 9600)
         ]
         parity = {"N": 0, "E": 1, "O": 2}[kwargs.get("new_parity", "N")]
@@ -519,7 +519,7 @@ class SeeedTH(ModbusSensor):
         new_slave_id: int,
         **kwargs,
     ):
-        baud = {38400: 0, 19200: 1, 9600: 2, 4800: 3, 2400: 4, 1200: 5}[
+        baud = {1200: 0, 2400: 1, 4800: 2, 9600: 3, 19200: 4, 38400: 5}[
             kwargs.get("new_baudrate", 9600)
         ]
         parity = {"N": 0, "E": 1, "O": 2}[kwargs.get("new_parity", "N")]
